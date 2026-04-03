@@ -1,4 +1,3 @@
-// ===== ChunghoICT DEMO - Account Chart =====
 const ACCT_INIT = [
 // 流動資産 (Current Assets)
 {c:"100",n:"現金",k:"현금",g:"자산"},{c:"101",n:"小口現金",k:"소액현금",g:"자산"},
@@ -101,45 +100,17 @@ const ACCT_INIT = [
 {c:"584",n:"貸倒引当金繰入",k:"대손충당금전입",g:"비용",p:"s"},
 ];
 
-// ===== DEMO JOURNAL ENTRIES (샘플 3건) =====
-const INIT_JOURNALS = [
-  {id:1,dt:"4/1",no:"S0001",desc:"자본금 납입",dr:"110",cr:"300",amt:50000000,vendor:"미즈호은행"},
-  {id:2,dt:"4/2",no:"S0002",desc:"사무실 임차보증금",dr:"180",cr:"110",amt:5000000,vendor:"도쿄부동산"},
-  {id:3,dt:"4/3",no:"S0003",desc:"업무용 노트북 구입",dr:"523",cr:"110",amt:250000,vendor:"ビックカメラ"},
-];
-
-// ===== DEMO HOLDINGS =====
+// ===== EMPTY DATA (DEMO) =====
+const INIT_JOURNALS = [];
 const INIT_HOLD_JP = [];
 const INIT_HOLD_US = [];
 const INIT_REAL = [];
-
-// ===== DEMO BANK =====
-const INIT_BK_IN = [
-  {id:1,dt:"2026-04-01",cat:"자본금",ja:"資本金",amt:50000000},
-];
-const INIT_BK_OUT = [
-  {id:1,dt:"2026-04-02",cat:"임차보증금",ja:"敷金",amt:5000000},
-  {id:2,dt:"2026-04-03",cat:"노트북구입",ja:"PC購入",amt:250000},
-];
-
-// ===== FINANCIAL STATEMENTS (빈 상태 - 전표에서 자동 집계) =====
-const FS = {
-  sga:[],sgaT:0,su:0,ol:0,
-  noi:[],noiT:0,noe:[],noeT:0,oi:0,ct:0,ni:0,
-  ast:[],cashT:0,secMV:0,totA:0,
-  lib:[],totL:0,eq:[],totE:0,
-  tax:[],taxT:0,taxP:0,taxF:0,taxD:0,
-  feeSum:{bC:0,bT:0,bTot:0,sC:0,sT:0,sTot:0,tC:0,tT:0,gT:0},
-};
+const INIT_BK_IN = [];
+const INIT_BK_OUT = [];
+const FS = {sga:[],sgaT:0,su:0,ol:0,noi:[],noiT:0,noe:[],noeT:0,oi:0,ct:0,ni:0,ast:[],cashT:0,secMV:0,totA:0,lib:[],totL:0,eq:[],totE:0,tax:[],taxT:0,taxP:0,taxF:0,taxD:0,feeSum:{bC:0,bT:0,bTot:0,sC:0,sT:0,sTot:0,tC:0,tT:0,gT:0}};
 const SEC_DEP = 0;
+const INIT_VENDORS = [];
 
-// ===== VENDORS =====
-const INIT_VENDORS = [
-  {id:1,name:"미즈호은행",note:"법인계좌"},
-  {id:2,name:"도쿄부동산",note:"사무실"},
-];
-
-// ===== SETTINGS =====
 const DEF_SET={rates:{USDJPY:149.50,JPYKRW:9.12},reportDate:''};
 let SET;
 try{const sv=localStorage.getItem('chungho_settings');SET=sv?{...DEF_SET,...JSON.parse(sv),rates:{...DEF_SET.rates,...(JSON.parse(sv).rates||{})}}:{...DEF_SET};}catch(e){SET={...DEF_SET};}

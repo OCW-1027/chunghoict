@@ -9,6 +9,8 @@ const DEF_DATA={holdJP:INIT_HOLD_JP,holdUS:INIT_HOLD_US,real:INIT_REAL,bkIn:INIT
 let D=loadJ(DKEY,DEF_DATA);
 // Migrate: always use fresh accts from ACCT_INIT (fixes JP->KR group name change)
 D.accts=ACCT_INIT;
+if(D.secDeposit===undefined)D.secDeposit=SEC_DEP;
+if(!D.vendors)D.vendors=INIT_VENDORS;
 // Also migrate any saved holdings/journals group refs
 
 function saveD(){localStorage.setItem(DKEY,JSON.stringify(D));}
@@ -152,35 +154,45 @@ function acctBal(code){
 }
 function dynamicFS(){
   const c=calc();
-  // P&L: all from journals
+  // P&L: all computed from journals
   const sgaCodes=['510','511','512','513','514','515','516','520','521','522','523','524','525','526','527','528','529','530','531','532','533','534','535','536','537','538','539','547','548','549','570','580','581','582','583','584'];
   const noiCodes=['401','402','403','404','405','406','407','408','409','410','411','412','413'];
-  const noeCodes=['540','541','542','543','544','545','546'];
-  const taxCodes=['550','551','552','553'];
   const specCodes=['560','561','562','563','564','565'];
-  let sgaT=0,noiT=0,noeBase=0,suT=0;
+  let sgaT=0,noiT=0,suT=0;
   sgaCodes.forEach(c2=>{sgaT+=acctBal(c2);});
   noiCodes.forEach(c2=>{noiT+=acctBal(c2);});
-  noeCodes.forEach(c2=>{noeBase+=acctBal(c2);});
   specCodes.forEach(c2=>{suT+=acctBal(c2);});
-  const ol=0-sgaT-suT; // 매출 0 가정
-  const interestPay=acctBal('540'); // 지급이자
+  const su=suT;
+  const ol=0-sgaT-su; // 매출 0
+  const interestPay=acctBal('540'); // 지급이자 from journals
   // Dynamic: unrealized P&L from current holdings
-  const evalLoss=Math.max(0, c.allC - c.allMv);
+  const evalLoss=Math.max(0, c.allC - c.allMv); // 보유종목 시가기준 실시간 // positive = loss
   const noeT=evalLoss+interestPay;
-  const oi=ol+noiT-noeT; // 경상이익
-  const ct=oi>0?Math.round(oi*0.2422):0; // simplified effective tax ~24.2%
+  const oi=ol+noiT-noeT;
+  // Use journal tax if exists, otherwise estimate
+  const journalCt=acctBal('550');
+  const ct=journalCt>0?journalCt:(oi>0?Math.round(oi*0.2422):0);
   const ni=oi-ct;
-  // B/S
-  const deposit=acctBal('110'); // 보통예금 from journals
-  const secDep=c.secDep; // 증권예수금
-  const secMV=c.allMv; // 유가증권(시가)
+  // B/S: journal + 시가 조정 (평가손 실시간 반영)
+  const deposit=acctBal('110');
+  const secDep=acctBal('191');
+  const secBookVal=acctBal('130'); // 전표 장부가
+  const secMV=c.allMv;
+  const journalEvalLoss=acctBal('542'); // 전표상 평가손
+  const evalAdj=evalLoss-journalEvalLoss; // 시가 조정액
+  const secForBS=secBookVal-evalAdj; // 시가 반영 유가증권
   const cashT=deposit+secDep;
-  const totA=cashT+secMV;
-  const loanBal=acctBal('221')+acctBal('220')+acctBal('202');const unpaid=acctBal('203')+acctBal('204');const totL=loanBal+interestPay+unpaid+ct;
+  const totA=cashT+secForBS;
+  // Liabilities + Equity: all from journals
+  const liabCodes=['200','201','202','203','204','205','206','207','208','209','210','211','212','213','214','215','216','217','220','221','222','223','224','225','226','227','228'];
+  let totL=0;liabCodes.forEach(c2=>{totL+=acctBal(c2);});
+  // Equity: from journals
+  const capitalBal=acctBal('300')+acctBal('301')+acctBal('302');
+  const retainedBal=acctBal('310')+acctBal('311')+acctBal('312');
+  // 이익잉여금 = journal retained + current period NI (if not yet closed)
   const eqNI=ni;
-  const totE=10000000+eqNI;
-  return {sgaT,su,ol,noiT,evalLoss,interestPay,noeT,oi,ct,ni,deposit,secDep,secMV,cashT,totA,totL,eqNI,totE};
+  const totE=capitalBal+retainedBal+eqNI;
+  return {sgaT,su,ol,noiT,evalLoss,interestPay,noeT,oi,ct,ni,deposit,secDep,secBookVal,secForBS,secMV,cashT,totA,totL,capitalBal,eqNI,totE,evalAdj};
 }
 
 
@@ -310,7 +322,7 @@ function calc(){
   const usMv=D.holdUS.reduce((s,h)=>s+h.mv,0),usC=D.holdUS.reduce((s,h)=>s+h.tc,0);
   const tI=D.bkIn.reduce((s,d)=>s+d.amt,0),tO=D.bkOut.reduce((s,d)=>s+d.amt,0);
   const rpl=D.real.reduce((s,r)=>s+r.net,0),rC=D.real.reduce((s,r)=>s+r.tc,0),rS=D.real.reduce((s,r)=>s+r.sa,0);
-  const bb=tI-tO,secDep=SEC_DEP,secBal=secDep+jpMv+usMv;
+  const bb=tI-tO,secDep=D.secDeposit||SEC_DEP,secBal=secDep+jpMv+usMv;
   return {jpMv,jpC,usMv,usC,allMv:jpMv+usMv,allC:jpC+usC,allPl:jpMv+usMv-jpC-usC,rpl,rC,rS,tI,tO,bb,secDep,secBal,totA:bb+secBal};
 }
 
@@ -525,10 +537,10 @@ function exportWord(){
 <tr><td style="${S}">자본금</td><td style="${HR}">10,000,000</td><td style="${S}"></td></tr>
 <tr><td style="${S}background:#f5f5f5">수입</td><td style="${HR}background:#f5f5f5">21,845</td><td style="${S}background:#f5f5f5"></td></tr>
 <tr><td style="${S}">지출</td><td style="${HR}">(1,624,866)</td><td style="${S}"></td></tr>
-<tr><td style="${S}background:#f5f5f5;font-weight:bold">법인계좌잔액---(1)</td><td style="${HB}background:#f5f5f5">${fm(c.bb)}</td><td style="${S}background:#f5f5f5;color:#888">미즈호은행</td></tr>
+<tr><td style="${S}background:#f5f5f5;font-weight:bold">법인계좌잔액---(1)</td><td style="${HB}background:#f5f5f5">${fm(c.bb)}</td><td style="${S}background:#f5f5f5;color:#888">은행</td></tr>
 <tr><td style="${S}">증권예수금</td><td style="${HR}">${fm(c.secDep)}</td><td style="${S}"></td></tr>
 <tr><td style="${S}background:#f5f5f5">유가증권평가액</td><td style="${HR}background:#f5f5f5">${fm(c.allMv)}</td><td style="${S}background:#f5f5f5"></td></tr>
-<tr><td style="${S}font-weight:bold">증권계좌잔액---(2)</td><td style="${HB}">${fm(c.secBal)}</td><td style="${S}color:#888">SMBC닛코증권</td></tr>
+<tr><td style="${S}font-weight:bold">증권계좌잔액---(2)</td><td style="${HB}">${fm(c.secBal)}</td><td style="${S}color:#888">증권회사</td></tr>
 <tr><td style="${S}background:#e8e8e8;font-weight:bold">총보유자산합계</td><td style="${HB}background:#e8e8e8">${fm(c.totA)}</td><td style="${S}background:#e8e8e8;color:#888">(1)+(2)</td></tr></table>
 
 <h2 style="font-size:13pt;color:#1e3a5f;border-bottom:2pt solid #1e3a5f;padding-bottom:4pt">2. 유가증권 평가 및 손익 현황</h2>
@@ -741,6 +753,19 @@ function editSlip(id){var j=D.journals.find(x=>x.id===id);if(!j)return;closeModa
 
 function copySlip(id){var j=D.journals.find(x=>x.id===id);if(!j)return;closeModal();window._editSlipId=null;go('slip');setTimeout(function(){var d2=document.getElementById('sl_desc');if(d2)d2.value=(j.desc||'')+' (복사)';var c2=document.getElementById('sl_cur');if(c2)c2.value=j.cur||'JPY';var vs=document.getElementById('sl_vendor_sel');if(vs)vs.value=j.vendor||'';var vi=document.getElementById('sl_vendor_inp');if(vi){vi.value=j.vendor||'';vi.style.display=vs&&vs.value?'none':'block';}var rows=document.querySelectorAll('#slipRows tr');if(rows[0]){rows[0].querySelector('.sl_side').value='dr';rows[0].querySelector('.sl_acct').value=j.dr;rows[0].querySelector('.sl_amt').value=j.amt;}if(rows[1]){rows[1].querySelector('.sl_side').value='cr';rows[1].querySelector('.sl_acct').value=j.cr;rows[1].querySelector('.sl_amt').value=j.amt;}updSlipBal();},300);}
 
+function saveDeposit(){
+  var el=document.getElementById('depEdit');
+  if(!el)return;
+  var raw=el.textContent.replace(/[,\s]/g,'');
+  var val=parseInt(raw);
+  if(!isNaN(val)&&val>=0){
+    D.secDeposit=val;
+    saveD();
+    el.textContent=fm(val);
+    alert('증권예수금 저장: ¥'+fm(val));
+    go('sec');
+  }
+}
 function calcSlipTax(sel){
   const tr=sel.closest('tr');
   const amt=+(tr.querySelector('.sl_amt').value)||0;
@@ -907,7 +932,7 @@ function rDash(){saveSnapshot();const c=calc();return `<div class="pt">대시보
 function rSec(){const c=calc();const jpT=c.jpMv;
   return `<div class="pt">유가증권</div>
   <div class="cards"><div class="cd bl"><div class="l">평가액</div><div class="v">${fy(c.allMv)}</div></div><div class="cd ${c.allPl>=0?'gn':'rd'}"><div class="l">평가손익</div><div class="v">${fy(c.allPl)}</div></div><div class="cd gn"><div class="l">실현손익</div><div class="v">+${fy(c.rpl)}</div></div></div>
-  <div class="pn" style="padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">증권예수금: <span id="depEdit" contenteditable="true" style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:2px 6px;cursor:pointer;outline:none">${fm(SEC_DEP)}</span> 엔</span></div>
+  <div class="pn" style="padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">증권예수금: <span id="depEdit" contenteditable="true" style="background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:2px 6px;cursor:pointer;outline:none">${fm(D.secDeposit||SEC_DEP)}</span> 엔</span><button class="bt" onclick="saveDeposit()" style="font-size:10px;padding:3px 10px">💾 저장</button></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div class="tabs" style="margin-bottom:0"><button class="tab on" data-tab="hold">보유현황</button><button class="tab" data-tab="real">수익실현</button></div><button class="bt" onclick="updatePrices()" style="background:#d97706">📊 시세 업데이트</button></div>
   <div id="TC">
   <div class="pn"><div class="ph"><span>가) 일본</span><button class="bt" onclick="addHoldJP()">+ 종목추가</button></div><div style="overflow-x:auto"><table style="min-width:900px">
@@ -943,28 +968,24 @@ function rBank(){const c=calc();let cI=0,cO=0;
 
 function rFS(){
   const d=dynamicFS();const c=calc();
-  // Build SGA items dynamically from journals
-  const sgaMap={};
+  // SGA: dynamically from journals
   const sgaCodeList=['520','521','523','526','531','532','536','537','570'];
-  sgaCodeList.forEach(code=>{const bal=acctBal(code);if(bal!==0){const ac=D.accts.find(x=>x.c===code);sgaMap[code]={nm:ac?ac.k:code,a:bal};}});
-  const sga=Object.values(sgaMap);
-  // NOI items
-  const noiMap={};
-  ['401','402','403','405'].forEach(code=>{const bal=acctBal(code);if(bal!==0){const ac=D.accts.find(x=>x.c===code);noiMap[code]={nm:ac?ac.k:code,a:bal};}});
-  const noi=Object.values(noiMap);
-  // NOE items
+  const sga=sgaCodeList.map(code=>{const bal=acctBal(code);return {nm:tAcct(code),a:bal};}).filter(x=>x.a!==0);
+  // NOI: dynamically from journals
+  const noi=['401','402','403','405'].map(code=>{const bal=acctBal(code);return {nm:tAcct(code),a:bal};}).filter(x=>x.a!==0);
+  // NOE
   const noe=[
     {nm:"유가증권평가손(미실현)",a:d.evalLoss,n:"보유종목 시가기준 자동반영"},
     {nm:"지급이자",a:d.interestPay}
   ].filter(x=>x.a>0);
 
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="pt">재무제표</div><button class="bt" onclick="exportFSWord()" style="background:#2563eb;font-size:11px">📥 워드 내보내기 (日本語)</button></div><div class="tabs"><button class="tab on" data-tab="pl">손익계산서</button><button class="tab" data-tab="bs">대차대조표</button><button class="tab" data-tab="tx">법인세추정</button></div>'+
-  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">ChunghoICT (단위:엔)</div></div>'+
-  '<div class="fr"><span>Ⅰ 매출고</span><span class="m">0</span></div><div class="fr b"><span>매출총이익</span><span class="m">0</span></div><div style="height:8px"></div>'+
-  '<div class="fr h"><span>Ⅱ 판매비및일반관리비</span></div>'+
+  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">ChunghoICT Co., Ltd. (단위:엔)</div></div>'+
+  '<div class="fr"><span>Ⅰ 매출액</span><span class="m">0</span></div><div class="fr b"><span>매출총이익</span><span class="m">0</span></div><div style="height:8px"></div>'+
+  '<div class="fr h"><span>Ⅱ 판매비와 일반관리비</span></div>'+
   sga.map(s=>'<div class="fr i"><span>'+s.nm+(s.n?' <span style="font-size:10px;color:#64748b">('+s.n+')</span>':'')+'</span><span class="m">'+fm(s.a)+'</span></div>').join('')+
   '<div class="fr b tl"><span>판관비 합계</span><span class="m">'+fm(d.sgaT)+'</span></div>'+
-  '<div class="fr"><span>창립비</span><span class="m">'+fm(d.su)+'</span></div>'+
+  '<div class="fr"><span>설립비</span><span class="m">'+fm(d.su)+'</span></div>'+
   '<div class="fr b tl" style="color:#dc2626"><span>영업손실</span><span class="m">'+fm(d.ol)+'</span></div><div style="height:8px"></div>'+
   '<div class="fr h"><span>Ⅲ 영업외수익</span></div>'+
   noi.map(s=>'<div class="fr i"><span>'+s.nm+(s.n?' <span style="font-size:10px;color:#64748b">('+s.n+')</span>':'')+'</span><span class="m">'+fm(s.a)+'</span></div>').join('')+
@@ -973,7 +994,7 @@ function rFS(){
   noe.map(s=>'<div class="fr i"><span>'+s.nm+(s.n?' <span style="font-size:10px;color:#64748b">('+s.n+')</span>':'')+'</span><span class="m">'+fm(s.a)+'</span></div>').join('')+
   '<div class="fr b tl"><span>영업외비용 합계</span><span class="m">'+fm(d.noeT)+'</span></div><div style="height:8px"></div>'+
   '<div class="fr b tl" style="color:#059669"><span>경상이익</span><span class="m">'+fm(d.oi)+'</span></div>'+
-  '<div class="fr"><span>Ⅴ 법인세등</span><span class="m">'+fm(d.ct)+'</span></div>'+
+  '<div class="fr"><span>Ⅴ 법인세 등</span><span class="m">'+fm(d.ct)+'</span></div>'+
   '<div style="display:flex;justify-content:space-between;padding:12px 14px;font-size:16px;font-weight:700;border-top:3px solid #e2e6ed;margin-top:8px;background:#d1fae560;border-radius:0 0 6px 6px"><span>당기순이익</span><span style="color:'+(d.ni>=0?'#059669':'#dc2626')+'" class="m">'+fy(d.ni)+'</span></div>'+
   '<div class="ib" style="margin-top:8px;font-size:10px">💡 유가증권평가손·법인세는 보유종목 시가 기준 자동 반영됩니다</div>'+
   '</div></div>';
@@ -1012,10 +1033,10 @@ function rRpt(){const c=calc();
     '<tr><td>자본금</td><td class="r m">10,000,000</td><td></td></tr>'+
     '<tr class="a"><td>수입</td><td class="r m">21,845</td><td></td></tr>'+
     '<tr><td>지출</td><td class="r m">(1,624,866)</td><td></td></tr>'+
-    '<tr class="a" style="font-weight:700"><td>법인계좌잔액---(1)</td><td class="r m b">'+fm(c.bb)+'</td><td class="mu">미즈호은행</td></tr>'+
+    '<tr class="a" style="font-weight:700"><td>법인계좌잔액---(1)</td><td class="r m b">'+fm(c.bb)+'</td><td class="mu">은행</td></tr>'+
     '<tr><td>증권예수금</td><td class="r m">'+fm(c.secDep)+'</td><td></td></tr>'+
     '<tr class="a"><td>유가증권평가액</td><td class="r m">'+fm(c.allMv)+'</td><td></td></tr>'+
-    '<tr style="font-weight:700"><td>증권계좌잔액---(2)</td><td class="r m b">'+fm(c.secBal)+'</td><td class="mu">SMBC닛코증권</td></tr>'+
+    '<tr style="font-weight:700"><td>증권계좌잔액---(2)</td><td class="r m b">'+fm(c.secBal)+'</td><td class="mu">증권회사</td></tr>'+
     '<tr class="t"><td>총보유자산합계</td><td class="r m">'+fm(c.totA)+'</td><td class="mu">(1)+(2)</td></tr>'+
     '</tbody></table></div>'+
 
@@ -1202,14 +1223,14 @@ function exportFSWord(){
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">Ⅱ　販売費及び一般管理費</td></tr>
-'+function(){var sgaCodes2=['520','521','523','526','531','532','536','537','570'];var rows='';sgaCodes2.forEach(function(code){var bal=acctBal(code);if(bal>0){var ac=D.accts.find(function(x){return x.c===code;});rows+='<tr><td>　'+(ac?ac.n:code)+'</td><td class="r">'+fm(bal)+'</td><td></td><td></td></tr>';}});return rows;}()+'
+'+function(){var codes=['520','521','523','526','531','532','536','537','570'];var r='';codes.forEach(function(c){var b=acctBal(c);if(b>0){var ac=D.accts.find(function(x){return x.c===c;});r+='<tr><td>　'+(ac?ac.n:c)+'</td><td class="r">'+fm(b)+'</td><td></td><td></td></tr>';}});return r;}()+'
 <tr class="sub"><td>　販管費合計</td><td></td><td class="r b">${fm(d.sgaT)}</td><td></td></tr>
 <tr><td>　創立費</td><td></td><td class="r">${fm(d.su)}</td><td></td></tr>
 <tr class="sub"><td>営業損失</td><td></td><td></td><td class="r b" style="color:#c0392b">${fm(d.ol)}</td></tr>
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">Ⅲ　営業外収益</td></tr>
-'+function(){var noiCodes2=['401','402','403','405'];var rows='';noiCodes2.forEach(function(code){var bal=acctBal(code);if(bal>0){var ac=D.accts.find(function(x){return x.c===code;});rows+='<tr><td>　'+(ac?ac.n:code)+'</td><td class="r">'+fm(bal)+'</td><td></td><td></td></tr>';}});return rows;}()+'
+'+function(){var codes=['401','402','403','405'];var r='';codes.forEach(function(c){var b=acctBal(c);if(b>0){var ac=D.accts.find(function(x){return x.c===c;});r+='<tr><td>　'+(ac?ac.n:c)+'</td><td class="r">'+fm(b)+'</td><td></td><td></td></tr>';}});return r;}()+'
 <tr class="sub"><td>　営業外収益合計</td><td></td><td></td><td class="r b">${fm(d.noiT)}</td></tr>
 <tr class="gap"><td colspan="4"></td></tr>
 
@@ -1246,7 +1267,7 @@ function exportFSWord(){
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">【負債の部】</td></tr>
-<tr><td>　役員借入金</td><td class="r">${fm(acctBal('221')+acctBal('220'))}</td><td></td><td></td></tr>
+<tr><td>　役員借入金</td><td class="r">${fm(acctBal("221")+acctBal("220"))}</td><td></td><td></td></tr>
 <tr><td>　未払利息（年1%、289日）</td><td class="r">${fm(d.interestPay)}</td><td></td><td></td></tr>
 <tr><td>　未払金（設立費）</td><td class="r">${fm(371400)}</td><td></td><td></td></tr>
 <tr><td>　未払法人税等</td><td class="r">${fm(d.ct)}</td><td></td><td></td></tr>
@@ -1297,20 +1318,21 @@ function rBSTab(){
   '<div class="fr"><span>보통예금</span><span class="m">'+fm(d.deposit)+'</span></div>'+
   '<div class="fr"><span>증권예수금</span><span class="m">'+fm(d.secDep)+'</span></div>'+
   '<div class="fr b tl"><span>현금·예금계</span><span class="m">'+fm(d.cashT)+'</span></div>'+
-  '<div class="fr"><span>유가증권(시가)</span><span class="m">'+fm(d.secMV)+'</span></div>'+
+  '<div class="fr"><span>유가증권(장부가)</span><span class="m">'+fm(d.secBookVal)+'</span></div>'+
+  '<div class="fr" style="font-size:10px;color:#64748b"><span>　※시가평가: '+fm(d.secMV)+'</span><span></span></div>'+
   '<div class="fr b tl" style="color:#2563eb;font-size:14px"><span>자산합계</span><span class="m">'+fm(d.totA)+'</span></div></div>'+
   '<div class="pn" style="padding:14px"><div style="text-align:center;font-size:14px;font-weight:700;color:#d97706;margin-bottom:10px">【부채】</div>'+
   '<div class="fr"><span>임원차입금</span><span class="m">'+fm(acctBal('221')+acctBal('220'))+'</span></div>'+
-  '<div class="fr"><span>미지급이자</span><span class="m">'+fm(d.interestPay)+'</span></div>'+
-  '<div class="fr"><span>미지급금(설립비)</span><span class="m">'+fm(371400)+'</span></div>'+
-  '<div class="fr"><span>미지급법인세등</span><span class="m">'+fm(d.ct)+'</span></div>'+
+  '<div class="fr"><span>미지급이자</span><span class="m">'+fm(acctBal('224'))+'</span></div>'+
+  '<div class="fr"><span>미지급금</span><span class="m">'+fm(acctBal('203'))+'</span></div>'+
+  '<div class="fr"><span>미지급법인세 등</span><span class="m">'+fm(acctBal('205'))+'</span></div>'+
   '<div class="fr b tl" style="color:#d97706"><span>부채합계</span><span class="m">'+fm(d.totL)+'</span></div>'+
   '<div style="text-align:center;font-size:14px;font-weight:700;color:#059669;margin:16px 0 10px">【순자산】</div>'+
-  '<div class="fr"><span>자본금</span><span class="m">'+fm(10000000)+'</span></div>'+
-  '<div class="fr"><span>이익잉여금</span><span class="m">'+fm(d.eqNI)+'</span></div>'+
+  '<div class="fr"><span>자본금</span><span class="m">'+fm(d.capitalBal)+'</span></div>'+
+  '<div class="fr"><span>이익잉여금(당기순이익)</span><span class="m">'+fm(d.eqNI)+'</span></div>'+
   '<div class="fr b tl" style="color:#059669"><span>순자산합계</span><span class="m">'+fm(d.totE)+'</span></div>'+
   '<div class="fr b tl" style="font-size:14px"><span>부채·순자산합계</span><span class="m">'+fm(d.totL+d.totE)+'</span></div></div></div>'+
-  '<div class="ib" style="font-size:10px">💡 보통예금=전표기준, 증권예수금·유가증권(시가)=보유종목 자동반영, 법인세=경상이익 기준 자동추정</div>';
+  '<div class="ib" style="font-size:10px">💡 전표 기반 자동집계. 유가증권평가손·유가증권은 보유종목 시가 자동반영 → 차대 균형 보장</div>';
 }
 
 function rTxTab(){return `<div class="pn" style="padding:18px;max-width:460px"><div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:12px">법인세등 추정</div>
