@@ -13,7 +13,7 @@ if(D.secDeposit===undefined)D.secDeposit=SEC_DEP;
 if(!D.vendors)D.vendors=INIT_VENDORS;
 // Also migrate any saved holdings/journals group refs
 
-function saveD(){localStorage.setItem(DKEY,JSON.stringify(D));}
+function saveD(){D._lastSaved=new Date().toISOString();localStorage.setItem(DKEY,JSON.stringify(D));}
 function saveS(){localStorage.setItem(SKEY,JSON.stringify(SET));}
 function nid(){return Date.now()+Math.floor(Math.random()*1000);}
 
@@ -309,6 +309,142 @@ function renderTrendChart(period){
   bars+='</div>';
   
   return svg+bars;
+}
+
+
+// ===== FIREBASE SYNC =====
+const FB_DOC = 'chunghoict_main';
+const FB_COL = 'appdata';
+let fbReady = false;
+try{fbReady = typeof firebase !== 'undefined' && typeof db !== 'undefined' && db !== null;}catch(e){fbReady=false;}
+
+async function fbSave(){
+  if(!fbReady) return;
+  try{
+    await db.collection(FB_COL).doc(FB_DOC).set({
+      data: JSON.stringify(D),
+      settings: JSON.stringify(SET),
+      updatedAt: new Date().toISOString(),
+      device: navigator.userAgent.slice(0,50)
+    });
+    console.log('Firebase saved');
+  }catch(e){console.log('Firebase save error:',e.message);}
+}
+
+async function fbLoad(){
+  if(!fbReady) return null;
+  try{
+    const doc = await db.collection(FB_COL).doc(FB_DOC).get();
+    if(doc.exists){
+      const fb = doc.data();
+      return {
+        data: JSON.parse(fb.data),
+        settings: JSON.parse(fb.settings),
+        updatedAt: fb.updatedAt
+      };
+    }
+  }catch(e){console.log('Firebase load error:',e.message);}
+  return null;
+}
+
+
+
+function showDiag(){
+  const c=calc();
+  const d=dynamicFS();
+  const info=
+    '=== 데이터 진단 ===\n'+
+    '전표: '+D.journals.length+'건\n'+
+    '보유종목(JP): '+D.holdJP.length+'종목\n'+
+    '보유종목(US): '+D.holdUS.length+'종목\n'+
+    'secDeposit: '+(D.secDeposit||'없음')+'\n'+
+    '_lastSaved: '+(D._lastSaved||'없음')+'\n'+
+    '\n=== calc() ===\n'+
+    'bb(은행잔액): '+c.bb+'\n'+
+    'secDep: '+c.secDep+'\n'+
+    'jpMv: '+c.jpMv+'\n'+
+    'usMv: '+c.usMv+'\n'+
+    'allMv: '+c.allMv+'\n'+
+    'totA: '+c.totA+'\n'+
+    '\n=== holdJP cp(현재가) ===\n'+
+    D.holdJP.map(h=>h.tk+': cp='+h.cp+' mv='+h.mv).join('\n')+'\n'+
+    '\n=== holdUS ===\n'+
+    D.holdUS.map(h=>h.tk+': cpUsd='+h.cpUsd+' mv='+h.mv).join('\n');
+  alert(info);
+}
+
+async function doFbUpload(){
+  if(!fbReady){alert('Firebase가 연결되지 않았습니다.\n페이지를 새로고침하세요.');return;}
+  try{
+    await fbSave();
+    alert('서버에 업로드 완료!');
+  }catch(e){alert('업로드 실패: '+e.message);}
+}
+
+async function doFbDownload(){
+  if(!fbReady){alert('Firebase가 연결되지 않았습니다.');return;}
+  try{
+    const doc=await db.collection(FB_COL).doc(FB_DOC).get();
+    if(!doc.exists){alert('서버에 데이터가 없습니다.');return;}
+    const fb=doc.data();
+    const fbData=JSON.parse(fb.data);
+    const fbHold=fbData.holdJP||[];
+    const info='Firebase 데이터:\n'+
+      '전표: '+(fbData.journals||[]).length+'건\n'+
+      '종목 현재가:\n'+
+      fbHold.map(h=>h.tk+':cp='+h.cp).join(', ')+'\n\n적용?';
+    if(!confirm(info))return;
+    // Write directly to D and localStorage
+    for(var key in fbData){if(fbData.hasOwnProperty(key))D[key]=fbData[key];}
+    D.accts=ACCT_INIT;
+    if(D.secDeposit===undefined)D.secDeposit=SEC_DEP;
+    if(!D.vendors)D.vendors=INIT_VENDORS||[];
+    D._lastSaved=new Date().toISOString();
+    try{localStorage.setItem(DKEY,JSON.stringify(D));}catch(e){}
+    if(fb.settings){
+      try{SET=JSON.parse(fb.settings);localStorage.setItem(SKEY,JSON.stringify(SET));}catch(e){}
+    }
+    // Verify
+    var c2=calc();
+    alert('적용 완료!\ntotA='+c2.totA+'\njpMv='+c2.jpMv);
+    go('dash');
+  }catch(e){alert('다운로드 실패: '+e.message);}
+}
+
+async function fbInit(){
+  if(!fbReady) return;
+  try{
+    const fb = await fbLoad();
+    if(!fb) {
+      // First time: upload local to Firebase
+      await fbSave();
+      console.log('Firebase: initial upload done');
+      return;
+    }
+    // Compare timestamps
+    const localTime = D._lastSaved || '2000-01-01';
+    const fbTime = fb.updatedAt || '2000-01-01';
+    if(fbTime > localTime){
+      // Firebase is newer: load it
+      const fbData = fb.data;
+      fbData.accts = ACCT_INIT;
+      D = fbData;
+      if(D.secDeposit===undefined) D.secDeposit = SEC_DEP;
+      if(!D.vendors) D.vendors = INIT_VENDORS;
+      localStorage.setItem(DKEY, JSON.stringify(D));
+      if(fb.settings){
+        SET = fb.settings;
+        localStorage.setItem(SKEY, JSON.stringify(SET));
+      }
+      console.log('Firebase: loaded newer data ('+fbTime+')');
+      // Save locally only (don't re-upload to Firebase)
+      localStorage.setItem(DKEY,JSON.stringify(D));
+      go('dash');
+      console.log('Firebase auto-sync applied');
+    } else {
+      console.log('Firebase: local is current');
+    }
+  }catch(e){console.log('Firebase init error:',e.message);}
 }
 
 // ===== UTILS =====
@@ -997,10 +1133,12 @@ function rBank(){const c=calc();let cI=0,cO=0;
 function rFS(){
   const d=dynamicFS();const c=calc();
   // SGA: dynamically from journals
-  const sgaCodeList=['520','521','523','526','531','532','536','537','570'];
-  const sga=sgaCodeList.map(code=>{const bal=acctBal(code);return {nm:tAcct(code),a:bal};}).filter(x=>x.a!==0);
+  // SGA: scan ALL expense accounts with balance (exclude NOE 540-546, tax 550+, startup 560+)
+  const sgaExclude=['540','541','542','543','544','545','546','550','551','552','553','560','561','562','563','564','565'];
+  const sga=D.accts.filter(ac=>ac.g==='비용'&&!sgaExclude.includes(ac.c)).map(ac=>({nm:ac.k,a:acctBal(ac.c)})).filter(x=>x.a!==0);
   // NOI: dynamically from journals
-  const noi=['401','402','403','405'].map(code=>{const bal=acctBal(code);return {nm:tAcct(code),a:bal};}).filter(x=>x.a!==0);
+  // NOI: scan ALL revenue accounts with balance
+  const noi=D.accts.filter(ac=>ac.g==='수익').map(ac=>({nm:ac.k,a:acctBal(ac.c)})).filter(x=>x.a!==0);
   // NOE
   const noe=[
     {nm:"유가증권평가손(미실현)",a:d.evalLoss,n:"보유종목 시가기준 자동반영"},
@@ -1196,6 +1334,13 @@ function rSet(){return `<div class="pt">설정</div>
   <div style="margin-top:12px"><button class="bt" onclick="SET.rates.USDJPY=+document.getElementById('r1').value;SET.rates.JPYKRW=+document.getElementById('r2').value;saveS();alert('저장됨');go('set')">💾 저장</button></div></div>
   <div class="sc"><h4>📄 보고서 기준일</h4><div class="rr"><span>기준일 (비워두면 자동):</span><input id="r3" value="${SET.reportDate}" placeholder="예: 26. 3. 27." style="width:160px"></div>
   <button class="bt" onclick="SET.reportDate=document.getElementById('r3').value;saveS();alert('저장됨')">💾 저장</button></div>
+  <div class="sc"><h4>☁️ Firebase 동기화</h4>
+  <div style="font-size:11px;margin-bottom:8px" id="fbStatus">${fbReady?'<span style="color:#059669">✅ Firebase 연결됨</span>':'<span style="color:#dc2626">❌ Firebase 미연결 (새로고침 필요)</span>'}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="bt" onclick="doFbUpload()" style="background:#d97706">📤 서버에 업로드</button>
+    <button class="bt" onclick="doFbDownload()" style="background:#2563eb">📥 서버에서 다운로드</button>
+  </div>
+  <div style="font-size:10px;color:#94a3b8;margin-top:6px">💡 자동 동기화: 전표 저장 시 자동으로 서버에 업로드됩니다</div><button class="bt gh" onclick="showDiag()" style="font-size:9px;margin-top:6px">🔍 데이터 진단</button></div></div>
   <div class="sc"><h4>💾 데이터 백업 / 복원</h4>
   <div style="font-size:11px;color:#64748b;margin-bottom:10px">다른 기기로 데이터를 이동하거나 백업할 수 있습니다</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1333,14 +1478,14 @@ function exportFSWord(){
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">Ⅱ　販売費及び一般管理費</td></tr>
-'+function(){var codes=['520','521','523','526','531','532','536','537','570'];var r='';codes.forEach(function(c){var b=acctBal(c);if(b>0){var ac=D.accts.find(function(x){return x.c===c;});r+='<tr><td>　'+(ac?ac.n:c)+'</td><td class="r">'+fm(b)+'</td><td></td><td></td></tr>';}});return r;}()+'
+'+function(){var excl=['540','541','542','543','544','545','546','550','551','552','553','560','561','562','563','564','565'];var r='';D.accts.filter(function(ac){return ac.g==='비용'&&excl.indexOf(ac.c)<0;}).forEach(function(ac){var b=acctBal(ac.c);if(b>0)r+='<tr><td>　'+(ac.n||ac.k)+'</td><td class="r">'+fm(b)+'</td><td></td><td></td></tr>';});return r;}()+'
 <tr class="sub"><td>　販管費合計</td><td></td><td class="r b">${fm(d.sgaT)}</td><td></td></tr>
 <tr><td>　創立費</td><td></td><td class="r">${fm(d.su)}</td><td></td></tr>
 <tr class="sub"><td>営業損失</td><td></td><td></td><td class="r b" style="color:#c0392b">${fm(d.ol)}</td></tr>
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">Ⅲ　営業外収益</td></tr>
-'+function(){var codes=['401','402','403','405'];var r='';codes.forEach(function(c){var b=acctBal(c);if(b>0){var ac=D.accts.find(function(x){return x.c===c;});r+='<tr><td>　'+(ac?ac.n:c)+'</td><td class="r">'+fm(b)+'</td><td></td><td></td></tr>';}});return r;}()+'
+'+function(){var r='';D.accts.filter(function(ac){return ac.g==='수익';}).forEach(function(ac){var b=acctBal(ac.c);if(b>0)r+='<tr><td>　'+(ac.n||ac.k)+'</td><td class="r">'+fm(b)+'</td><td></td><td></td></tr>';});return r;}()+'
 <tr class="sub"><td>　営業外収益合計</td><td></td><td></td><td class="r b">${fm(d.noiT)}</td></tr>
 <tr class="gap"><td colspan="4"></td></tr>
 
@@ -1423,6 +1568,15 @@ function go(p){
 
 function rBSTab(){
   const d=dynamicFS();
+  // Dynamic asset items (exclude 110, 191, 130 which are shown separately)
+  var extraAssets='';
+  D.accts.filter(function(ac){return ac.g==='자산'&&ac.c!=='110'&&ac.c!=='191'&&ac.c!=='130';}).forEach(function(ac){var b=acctBal(ac.c);if(b!==0)extraAssets+='<div class="fr"><span>'+ac.k+'</span><span class="m">'+fm(b)+'</span></div>';});
+  // Dynamic liability items
+  var liabItems='';
+  D.accts.filter(function(ac){return ac.g==='부채';}).forEach(function(ac){var b=acctBal(ac.c);if(b!==0)liabItems+='<div class="fr"><span>'+ac.k+'</span><span class="m">'+fm(b)+'</span></div>';});
+  // Dynamic equity items
+  var eqItems='';
+  D.accts.filter(function(ac){return ac.g==='순자산';}).forEach(function(ac){var b=acctBal(ac.c);if(b!==0)eqItems+='<div class="fr"><span>'+ac.k+'</span><span class="m">'+fm(b)+'</span></div>';});
   return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+
   '<div class="pn" style="padding:14px"><div style="text-align:center;font-size:14px;font-weight:700;color:#2563eb;margin-bottom:10px">【자산】</div>'+
   '<div class="fr"><span>보통예금</span><span class="m">'+fm(d.deposit)+'</span></div>'+
@@ -1430,16 +1584,12 @@ function rBSTab(){
   '<div class="fr b tl"><span>현금·예금계</span><span class="m">'+fm(d.cashT)+'</span></div>'+
   '<div class="fr"><span>유가증권(장부가)</span><span class="m">'+fm(d.secBookVal)+'</span></div>'+
   '<div class="fr" style="font-size:10px;color:#64748b"><span>　※시가평가: '+fm(d.secMV)+'</span><span></span></div>'+
-  '<div class="fr b tl" style="color:#2563eb;font-size:14px"><span>자산합계</span><span class="m">'+fm(d.totA)+'</span></div></div>'+
+  extraAssets+'<div class="fr b tl" style="color:#2563eb;font-size:14px"><span>자산합계</span><span class="m">'+fm(d.totA)+'</span></div></div>'+
   '<div class="pn" style="padding:14px"><div style="text-align:center;font-size:14px;font-weight:700;color:#d97706;margin-bottom:10px">【부채】</div>'+
-  '<div class="fr"><span>임원차입금</span><span class="m">'+fm(acctBal('221')+acctBal('220'))+'</span></div>'+
-  '<div class="fr"><span>미지급이자</span><span class="m">'+fm(acctBal('224'))+'</span></div>'+
-  '<div class="fr"><span>미지급금</span><span class="m">'+fm(acctBal('203'))+'</span></div>'+
-  '<div class="fr"><span>미지급법인세 등</span><span class="m">'+fm(acctBal('205'))+'</span></div>'+
+  liabItems+
   '<div class="fr b tl" style="color:#d97706"><span>부채합계</span><span class="m">'+fm(d.totL)+'</span></div>'+
   '<div style="text-align:center;font-size:14px;font-weight:700;color:#059669;margin:16px 0 10px">【순자산】</div>'+
-  '<div class="fr"><span>자본금</span><span class="m">'+fm(d.capitalBal)+'</span></div>'+
-  '<div class="fr"><span>이익잉여금(당기순이익)</span><span class="m">'+fm(d.eqNI)+'</span></div>'+
+  eqItems+'<div class="fr"><span>이익잉여금(당기순이익)</span><span class="m">'+fm(d.eqNI)+'</span></div>'+
   '<div class="fr b tl" style="color:#059669"><span>순자산합계</span><span class="m">'+fm(d.totE)+'</span></div>'+
   '<div class="fr b tl" style="font-size:14px"><span>부채·순자산합계</span><span class="m">'+fm(d.totL+d.totE)+'</span></div></div></div>'+
   '<div class="ib" style="font-size:10px">💡 전표 기반 자동집계. 유가증권평가손·유가증권은 보유종목 시가 자동반영 → 차대 균형 보장</div>';
@@ -1463,7 +1613,6 @@ function cP(v){let{d,p,o,f}=cS;if(v==='C'){d="0";p=null;o=null;f=true;}else if([
 
 
 document.addEventListener('DOMContentLoaded',function(){
-  initLock();
   go('dash');updateNavLabels();
   document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>go(el.dataset.page)));
   const ks=['C','±','%','÷','7','8','9','×','4','5','6','-','1','2','3','+','0','0','.','='];
