@@ -152,12 +152,21 @@ function acctBal(code){
 }
 function dynamicFS(){
   const c=calc();
-  // P&L fixed items (from journals - don't change)
-  const sgaT=3037959, su=371400, ol=-3409359;
-  const noiT=12630870; // realized gains from journals
-  const interestPay=1187671; // fixed
+  // P&L: all from journals
+  const sgaCodes=['510','511','512','513','514','515','516','520','521','522','523','524','525','526','527','528','529','530','531','532','533','534','535','536','537','538','539','547','548','549','570','580','581','582','583','584'];
+  const noiCodes=['401','402','403','404','405','406','407','408','409','410','411','412','413'];
+  const noeCodes=['540','541','542','543','544','545','546'];
+  const taxCodes=['550','551','552','553'];
+  const specCodes=['560','561','562','563','564','565'];
+  let sgaT=0,noiT=0,noeBase=0,suT=0;
+  sgaCodes.forEach(c2=>{sgaT+=acctBal(c2);});
+  noiCodes.forEach(c2=>{noiT+=acctBal(c2);});
+  noeCodes.forEach(c2=>{noeBase+=acctBal(c2);});
+  specCodes.forEach(c2=>{suT+=acctBal(c2);});
+  const ol=0-sgaT-suT; // 매출 0 가정
+  const interestPay=acctBal('540'); // 지급이자
   // Dynamic: unrealized P&L from current holdings
-  const evalLoss=Math.max(0, c.allC - c.allMv); // positive = loss
+  const evalLoss=Math.max(0, c.allC - c.allMv);
   const noeT=evalLoss+interestPay;
   const oi=ol+noiT-noeT; // 경상이익
   const ct=oi>0?Math.round(oi*0.2422):0; // simplified effective tax ~24.2%
@@ -168,7 +177,7 @@ function dynamicFS(){
   const secMV=c.allMv; // 유가증권(시가)
   const cashT=deposit+secDep;
   const totA=cashT+secMV;
-  const totL=150000000+interestPay+371400+ct; // liabilities with updated tax
+  const loanBal=acctBal('221')+acctBal('220')+acctBal('202');const unpaid=acctBal('203')+acctBal('204');const totL=loanBal+interestPay+unpaid+ct;
   const eqNI=ni;
   const totE=10000000+eqNI;
   return {sgaT,su,ol,noiT,evalLoss,interestPay,noeT,oi,ct,ni,deposit,secDep,secMV,cashT,totA,totL,eqNI,totE};
@@ -934,19 +943,20 @@ function rBank(){const c=calc();let cI=0,cO=0;
 
 function rFS(){
   const d=dynamicFS();const c=calc();
-  const sga=[
-    {nm:"접대교제비",a:350036},{nm:"차량비",a:238071},{nm:"여비교통비",a:138245},
-    {nm:"해외출장비",a:686794},{nm:"소모품비",a:201420},{nm:"지급수수료(EB)",a:6600},
-    {nm:"유가증권매매수수료",a:1413093,n:"세전1,284,632+소비세128,461"},{nm:"잡비",a:3700}
-  ];
-  const noi=[
-    {nm:"유가증권매각이익(총액)",a:12599320,n:"수수료공제전"},
-    {nm:"배당금",a:6356},{nm:"이자수입(세후)",a:21845},{nm:"잡수입",a:3349}
-  ];
+  // Build SGA items dynamically from journals
+  const sgaMap={};
+  const sgaCodeList=['520','521','523','526','531','532','536','537','570'];
+  sgaCodeList.forEach(code=>{const bal=acctBal(code);if(bal!==0){const ac=D.accts.find(x=>x.c===code);sgaMap[code]={nm:ac?ac.k:code,a:bal};}});
+  const sga=Object.values(sgaMap);
+  // NOI items
+  const noiMap={};
+  ['401','402','403','405'].forEach(code=>{const bal=acctBal(code);if(bal!==0){const ac=D.accts.find(x=>x.c===code);noiMap[code]={nm:ac?ac.k:code,a:bal};}});
+  const noi=Object.values(noiMap);
+  // NOE items
   const noe=[
     {nm:"유가증권평가손(미실현)",a:d.evalLoss,n:"보유종목 시가기준 자동반영"},
-    {nm:"지급이자(임원차입 연1%)",a:d.interestPay,n:"1.5억×1%×289일/365일"}
-  ];
+    {nm:"지급이자",a:d.interestPay}
+  ].filter(x=>x.a>0);
 
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="pt">재무제표</div><button class="bt" onclick="exportFSWord()" style="background:#2563eb;font-size:11px">📥 워드 내보내기 (日本語)</button></div><div class="tabs"><button class="tab on" data-tab="pl">손익계산서</button><button class="tab" data-tab="bs">대차대조표</button><button class="tab" data-tab="tx">법인세추정</button></div>'+
   '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">ChunghoICT (단위:엔)</div></div>'+
@@ -1192,26 +1202,14 @@ function exportFSWord(){
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">Ⅱ　販売費及び一般管理費</td></tr>
-<tr><td>　交際接待費</td><td class="r">350,036</td><td></td><td></td></tr>
-<tr><td>　車両費</td><td class="r">238,071</td><td></td><td></td></tr>
-<tr><td>　旅費交通費</td><td class="r">138,245</td><td></td><td></td></tr>
-<tr><td>　海外渡航費</td><td class="r">686,794</td><td></td><td></td></tr>
-<tr><td>　消耗品費</td><td class="r">201,420</td><td></td><td></td></tr>
-<tr><td>　支払手数料（EB）</td><td class="r">6,600</td><td></td><td></td></tr>
-<tr><td>　有価証券売買手数料</td><td class="r">1,413,093</td><td></td><td></td></tr>
-<tr><td colspan="4" class="note">　　※税抜 1,284,632 ＋ 消費税 128,461</td></tr>
-<tr><td>　雑費</td><td class="r">3,700</td><td></td><td></td></tr>
+'+function(){var sgaCodes2=['520','521','523','526','531','532','536','537','570'];var rows='';sgaCodes2.forEach(function(code){var bal=acctBal(code);if(bal>0){var ac=D.accts.find(function(x){return x.c===code;});rows+='<tr><td>　'+(ac?ac.n:code)+'</td><td class="r">'+fm(bal)+'</td><td></td><td></td></tr>';}});return rows;}()+'
 <tr class="sub"><td>　販管費合計</td><td></td><td class="r b">${fm(d.sgaT)}</td><td></td></tr>
 <tr><td>　創立費</td><td></td><td class="r">${fm(d.su)}</td><td></td></tr>
 <tr class="sub"><td>営業損失</td><td></td><td></td><td class="r b" style="color:#c0392b">${fm(d.ol)}</td></tr>
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">Ⅲ　営業外収益</td></tr>
-<tr><td>　有価証券売却益（総額）</td><td class="r">12,599,320</td><td></td><td></td></tr>
-<tr><td colspan="4" class="note">　　※手数料控除前の総額</td></tr>
-<tr><td>　配当金</td><td class="r">6,356</td><td></td><td></td></tr>
-<tr><td>　受取利息（税引後）</td><td class="r">21,845</td><td></td><td></td></tr>
-<tr><td>　雑収入</td><td class="r">3,349</td><td></td><td></td></tr>
+'+function(){var noiCodes2=['401','402','403','405'];var rows='';noiCodes2.forEach(function(code){var bal=acctBal(code);if(bal>0){var ac=D.accts.find(function(x){return x.c===code;});rows+='<tr><td>　'+(ac?ac.n:code)+'</td><td class="r">'+fm(bal)+'</td><td></td><td></td></tr>';}});return rows;}()+'
 <tr class="sub"><td>　営業外収益合計</td><td></td><td></td><td class="r b">${fm(d.noiT)}</td></tr>
 <tr class="gap"><td colspan="4"></td></tr>
 
@@ -1248,7 +1246,7 @@ function exportFSWord(){
 <tr class="gap"><td colspan="4"></td></tr>
 
 <tr class="sec"><td colspan="4">【負債の部】</td></tr>
-<tr><td>　役員借入金</td><td class="r">${fm(150000000)}</td><td></td><td></td></tr>
+<tr><td>　役員借入金</td><td class="r">${fm(acctBal('221')+acctBal('220'))}</td><td></td><td></td></tr>
 <tr><td>　未払利息（年1%、289日）</td><td class="r">${fm(d.interestPay)}</td><td></td><td></td></tr>
 <tr><td>　未払金（設立費）</td><td class="r">${fm(371400)}</td><td></td><td></td></tr>
 <tr><td>　未払法人税等</td><td class="r">${fm(d.ct)}</td><td></td><td></td></tr>
@@ -1302,7 +1300,7 @@ function rBSTab(){
   '<div class="fr"><span>유가증권(시가)</span><span class="m">'+fm(d.secMV)+'</span></div>'+
   '<div class="fr b tl" style="color:#2563eb;font-size:14px"><span>자산합계</span><span class="m">'+fm(d.totA)+'</span></div></div>'+
   '<div class="pn" style="padding:14px"><div style="text-align:center;font-size:14px;font-weight:700;color:#d97706;margin-bottom:10px">【부채】</div>'+
-  '<div class="fr"><span>임원차입금</span><span class="m">'+fm(150000000)+'</span></div>'+
+  '<div class="fr"><span>임원차입금</span><span class="m">'+fm(acctBal('221')+acctBal('220'))+'</span></div>'+
   '<div class="fr"><span>미지급이자</span><span class="m">'+fm(d.interestPay)+'</span></div>'+
   '<div class="fr"><span>미지급금(설립비)</span><span class="m">'+fm(371400)+'</span></div>'+
   '<div class="fr"><span>미지급법인세등</span><span class="m">'+fm(d.ct)+'</span></div>'+
