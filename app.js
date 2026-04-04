@@ -1,5 +1,5 @@
 // ===== STORAGE =====
-const DKEY='taesung_data', SKEY='taesung_settings';
+const DKEY='chungho_data', SKEY='chungho_settings';
 // DEF_SET defined above
 function loadJ(k,def){try{const v=localStorage.getItem(k);return v?{...def,...JSON.parse(v)}:def;}catch(e){return def;}}
 // SET defined above
@@ -21,7 +21,7 @@ function nid(){return Date.now()+Math.floor(Math.random()*1000);}
 
 
 // ===== PIN LOCK =====
-const PIN_KEY='taesung_pin';
+const PIN_KEY='chungho_pin';
 let pinBuffer='';
 let pinMode='unlock'; // 'unlock','setNew','confirmNew'
 let pinTemp='';
@@ -133,7 +133,7 @@ function fetchRate(){
       const krwRate=data.rates.KRW;
       SET.rates.USDJPY=Math.round(jpyRate*1000000)/1000000;
       SET.rates.JPYKRW=krwRate&&jpyRate?Math.round(krwRate/jpyRate*1000000)/1000000:SET.rates.JPYKRW;
-      localStorage.setItem('taesung_settings',JSON.stringify(SET));
+      localStorage.setItem('chungho_settings',JSON.stringify(SET));
       if(btn)btn.textContent='✅ 완료! USD/JPY: '+SET.rates.USDJPY;
       // Update settings page inputs if visible
       const r1=document.getElementById('r1');if(r1)r1.value=SET.rates.USDJPY;
@@ -318,7 +318,7 @@ function renderTrendChart(period){
 
 
 // ===== FIREBASE SYNC =====
-const FB_DOC = 'taesung_main';
+const FB_DOC = 'chunghoict_main';
 const FB_COL = 'appdata';
 let fbReady = false;
 
@@ -1062,17 +1062,17 @@ function exportWord(){
 <head><meta charset="utf-8">
 <style>@page{size:A4 landscape;margin:12mm} body{font-family:'Malgun Gothic',sans-serif;font-size:11pt;color:#1a2030}</style></head>
 <body>
-<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
+<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">ChunghoICT 자금운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
 
 <h2 style="font-size:13pt;color:#1e3a5f;border-bottom:2pt solid #1e3a5f;padding-bottom:4pt">1. 총자산내역</h2>
 <table ${T}><tr><td style="${TH}">구분</td><td style="${THR}">내역(엔)</td><td style="${TH}">비고</td></tr>
 <tr><td style="${S}">자본금</td><td style="${HR}">${fm(acctBal("300"))}</td><td style="${S}"></td></tr>
 <tr><td style="${S}background:#f5f5f5">수입</td><td style="${HR}background:#f5f5f5">${fm(opIn2)}</td><td style="${S}background:#f5f5f5"></td></tr>
 <tr><td style="${S}">지출</td><td style="${HR}color:#dc2626">(${fm(opOut2)})</td><td style="${S}"></td></tr>
-<tr><td style="${S}background:#f5f5f5;font-weight:bold">법인계좌잔액---(1)</td><td style="${HB}background:#f5f5f5">${fm(c.bb)}</td><td style="${S}background:#f5f5f5;color:#888">미츠이스미토모</td></tr>
+<tr><td style="${S}background:#f5f5f5;font-weight:bold">법인계좌잔액---(1)</td><td style="${HB}background:#f5f5f5">${fm(c.bb)}</td><td style="${S}background:#f5f5f5;color:#888">은행</td></tr>
 <tr><td style="${S}">증권예수금</td><td style="${HR}">${fm(c.secDep)}</td><td style="${S}"></td></tr>
 <tr><td style="${S}background:#f5f5f5">유가증권평가액</td><td style="${HR}background:#f5f5f5">${fm(c.allMv)}</td><td style="${S}background:#f5f5f5"></td></tr>
-<tr><td style="${S}font-weight:bold">증권계좌잔액---(2)</td><td style="${HB}">${fm(c.secBal)}</td><td style="${S}color:#888">SMBC닛코증권</td></tr>
+<tr><td style="${S}font-weight:bold">증권계좌잔액---(2)</td><td style="${HB}">${fm(c.secBal)}</td><td style="${S}color:#888">증권회사</td></tr>
 <tr><td style="${S}background:#e8e8e8;font-weight:bold">총보유자산합계</td><td style="${HB}background:#e8e8e8">${fm(c.totA)}</td><td style="${S}background:#e8e8e8;color:#888">(1)+(2)</td></tr></table>
 
 <h2 style="font-size:13pt;color:#1e3a5f;border-bottom:2pt solid #1e3a5f;padding-bottom:4pt">2. 유가증권 평가 및 손익 현황</h2>
@@ -1102,12 +1102,12 @@ ${realRows}
 <table style="width:48%;border-collapse:collapse;float:left"><tr><td colspan="4" style="${TH}${R}">출금 상세내역</td></tr><tr><td style="${TH}">일자</td><td style="${TH}">구분</td><td style="${THR}">출금액</td><td style="${THR}">누적</td></tr>${bkOutRows}
 <tr><td colspan="2" style="${S}background:#e8e8e8;font-weight:bold;text-align:right">잔액</td><td colspan="2" style="${HB}background:#e8e8e8;color:#2563eb;font-size:12pt">${fm(c.bb)}</td></tr></table>
 <div style="clear:both"></div>
-<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 태성㈜ 재무관리 프로그램에서 자동 생성되었습니다.</p>
+<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 ChunghoICT 재무관리 프로그램에서 자동 생성되었습니다.</p>
 </body></html>`;
 
   const blob=new Blob([wordHTML],{type:'application/msword'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
-  a.href=url;a.download='태성_자금운용보고서_'+new Date().toISOString().slice(0,10)+'.doc';
+  a.href=url;a.download='ChunghoICT_운용보고서_'+new Date().toISOString().slice(0,10)+'.doc';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
@@ -1600,7 +1600,7 @@ function rFS(){
   ].filter(x=>x.a>0);
 
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="pt">재무제표</div><button class="bt" onclick="exportFSWord()" style="background:#2563eb;font-size:11px">📥 워드 내보내기 (日本語)</button></div><div class="tabs"><button class="tab on" data-tab="pl">손익계산서</button><button class="tab" data-tab="bs">대차대조표</button><button class="tab" data-tab="tx">법인세추정</button><button class="tab" data-tab="monthly" onclick="showMonthlyTab(this)">월차추이</button><button class="tab" data-tab="expense" onclick="showExpenseTab(this)">비용분석</button></div>'+
-  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">태성주식회사 (단위:엔)</div></div>'+
+  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">ChunghoICT Co., Ltd. (단위:엔)</div></div>'+
   '<div class="fr"><span>Ⅰ 매출액</span><span class="m">0</span></div><div class="fr b"><span>매출총이익</span><span class="m">0</span></div><div style="height:8px"></div>'+
   '<div class="fr h"><span>Ⅱ 판매비와 일반관리비</span></div>'+
   sga.map(s=>'<div class="fr i"><span>'+s.nm+(s.n?' <span style="font-size:10px;color:#64748b">('+s.n+')</span>':'')+'</span><span class="m">'+fm(s.a)+'</span></div>').join('')+
@@ -1653,7 +1653,7 @@ function rRpt(){const c=calc();
   D.bkOut.forEach((d,i)=>{cO+=d.amt;bkOutRows+='<tr class="'+(i%2?'a':'')+'"><td class="mu m">'+d.dt+'</td><td>'+d.cat+'</td><td class="r m rd">'+fm(d.amt)+'</td><td class="r m">'+fm(cO)+'</td></tr>';});
 
   return '<div style="max-width:1100px" id="rptContent">'+
-    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
+    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">ChunghoICT 자금운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
     '<div style="display:flex;gap:8px;margin-bottom:12px"><button class="bt" onclick="window.print()">🖨 인쇄 (A4)</button><button class="bt" onclick="exportWord()" style="background:#2563eb">📥 워드 내보내기</button></div>'+
 
     // 1. 총자산내역
@@ -1664,10 +1664,10 @@ function rRpt(){const c=calc();
     '<tr><td>지출</td><td class="r m" style="color:#dc2626">('+fm(opOut)+')</td><td class="mu">경비 지출</td></tr>'+
     '<tr class="a" style="font-size:10px;color:#64748b"><td>　참고) 총입금 (증권이체 포함)</td><td class="r m" style="color:#64748b">'+fm(tI-acctBal('300'))+'</td><td class="mu" style="color:#64748b">자본금 외 전체</td></tr>'+
     '<tr style="font-size:10px;color:#64748b"><td>　참고) 총출금 (증권이체 포함)</td><td class="r m" style="color:#64748b">('+fm(tO)+')</td><td></td></tr>'+
-    '<tr class="a" style="font-weight:700"><td>법인계좌잔액---(1)</td><td class="r m b">'+fm(c.bb)+'</td><td class="mu">미츠이스미토모</td></tr>'+
+    '<tr class="a" style="font-weight:700"><td>법인계좌잔액---(1)</td><td class="r m b">'+fm(c.bb)+'</td><td class="mu">은행</td></tr>'+
     '<tr><td>증권예수금</td><td class="r m">'+fm(c.secDep)+'</td><td></td></tr>'+
     '<tr class="a"><td>유가증권평가액</td><td class="r m">'+fm(c.allMv)+'</td><td></td></tr>'+
-    '<tr style="font-weight:700"><td>증권계좌잔액---(2)</td><td class="r m b">'+fm(c.secBal)+'</td><td class="mu">SMBC닛코증권</td></tr>'+
+    '<tr style="font-weight:700"><td>증권계좌잔액---(2)</td><td class="r m b">'+fm(c.secBal)+'</td><td class="mu">증권회사</td></tr>'+
     '<tr class="t"><td>총보유자산합계</td><td class="r m">'+fm(c.totA)+'</td><td class="mu">(1)+(2)</td></tr>'+
     '</tbody></table></div>'+
 
@@ -1720,7 +1720,7 @@ function rRpt(){const c=calc();
 // ===== DATA BACKUP / RESTORE =====
 function exportBackup(){
   const backup={
-    version:'taesung_v26',
+    version:'chunghoict_v26',
     exportDate:new Date().toISOString(),
     data:D,
     settings:SET,
@@ -1731,7 +1731,7 @@ function exportBackup(){
   const url=URL.createObjectURL(blob);
   const a2=document.createElement('a');
   a2.href=url;
-  a2.download='taesung_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a2.download='chunghoict_backup_'+new Date().toISOString().slice(0,10)+'.json';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
   URL.revokeObjectURL(url);
   alert('백업 완료!\n파일: '+a2.download);
@@ -1862,7 +1862,7 @@ function exportGLExcel(){
     bal[j.cr].cr+=j.amt;bal[j.cr].entries.push({...j,isDr:false});
   });
   let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{mso-number-format:"\@"}</style></head><body>';
-  html+='<h2 style="font-size:14pt;color:#1e3a5f">泰成株式会社　総勘定元帳</h2>';
+  html+='<h2 style="font-size:14pt;color:#1e3a5f">ChunghoICT Co., Ltd.　総勘定元帳</h2>';
   html+='<p style="font-size:9pt;color:#666">自 令和7年6月2日 至 令和8年4月2日（暫定）</p><br>';
   
   const groups={"자산":"資産","부채":"負債","순자산":"純資産","수익":"収益","비용":"費用"};
@@ -1886,7 +1886,7 @@ function exportGLExcel(){
   html+='</body></html>';
   const blob=new Blob([html],{type:'application/vnd.ms-excel'});
   const url=URL.createObjectURL(blob);const a2=document.createElement('a');
-  a2.href=url;a2.download='泰成_総勘定元帳_'+new Date().toISOString().slice(0,10)+'.xls';
+  a2.href=url;a2.download='ChunghoICT_総勘定元帳_'+new Date().toISOString().slice(0,10)+'.xls';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
@@ -1927,7 +1927,7 @@ function exportFSWord(){
   html+=`
 <div class="stamp"><div class="s1">決裁</div><div class="s2">本人専決</div></div>
 <h1>損 益 計 算 書</h1>
-<div class="sub">泰成株式会社<br>自 令和7年6月2日（設立日）至 令和8年4月2日（暫定）<br>（単位：円）</div>
+<div class="sub">ChunghoICT Co., Ltd.<br>自 令和7年6月2日（設立日）至 令和8年4月2日（暫定）<br>（単位：円）</div>
 
 <table>
 <tr><th style="width:35%">科目</th><th class="r" style="width:20%">内訳</th><th class="r" style="width:20%">小計</th><th class="r" style="width:25%">合計</th></tr>
@@ -1967,7 +1967,7 @@ function exportFSWord(){
 
 <div class="stamp"><div class="s1">決裁</div><div class="s2">本人専決</div></div>
 <h1>貸 借 対 照 表</h1>
-<div class="sub">泰成株式会社<br>令和8年4月2日現在（暫定）<br>（単位：円）</div>
+<div class="sub">ChunghoICT Co., Ltd.<br>令和8年4月2日現在（暫定）<br>（単位：円）</div>
 
 <table>
 <tr><th style="width:40%">科目</th><th class="r" style="width:20%">内訳</th><th class="r" style="width:20%">小計</th><th class="r" style="width:20%">合計</th></tr>
@@ -1996,12 +1996,12 @@ function exportFSWord(){
 <tr class="total" style="background:#0d1b3e"><td>負債・純資産合計</td><td></td><td></td><td class="r" style="font-size:12pt">${fm(d.totL+d.totE)}</td></tr>
 </table>
 
-<div class="footer">泰成株式会社 財務管理システム ｜ 出力日: ${dateStr} ｜ 本書は暫定値に基づく参考資料です</div>
+<div class="footer">ChunghoICT Co., Ltd. 財務管理システム ｜ 出力日: ${dateStr} ｜ 本書は暫定値に基づく参考資料です</div>
 </body></html>`;
 
   const blob=new Blob([html],{type:'application/msword'});
   const url=URL.createObjectURL(blob);const a2=document.createElement('a');
-  a2.href=url;a2.download='泰成_財務諸表_'+new Date().toISOString().slice(0,10)+'.doc';
+  a2.href=url;a2.download='ChunghoICT_財務諸表_'+new Date().toISOString().slice(0,10)+'.doc';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
@@ -2069,7 +2069,7 @@ function rTxTab(){
   
   return '<div class="pn" style="padding:18px;max-width:520px">'+
     '<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:4px">법인세 등 추정 상세</div>'+
-    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">태성주식회사 (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
+    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">ChunghoICT Co., Ltd. (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
     '<div class="fr h"><span>경상이익 (과세소득)</span><span class="m">'+fm(oi)+'</span></div>'+
     '<div style="height:8px"></div>'+
     '<div class="fr h" style="color:#1e3a5f"><span>① 국세</span></div>'+
