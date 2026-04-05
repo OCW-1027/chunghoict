@@ -835,6 +835,20 @@ function rExpenseAnalysis(){
   return chartHtml+pieHtml+tableHtml;
 }
 
+
+// ===== One-time ADJ fix =====
+function fixAdjEntries(){
+  var fixed=0;
+  D.journals.forEach(function(j){
+    if(j.no==='ADJ01'){j.dt='9/18';j.no='S0671';j.desc='IPO증거금 증권이체';fixed++;}
+    if(j.no==='ADJ02'){j.dt='3/18';j.no='S0900';j.desc='매수수수료 취득원가 반영(보유종목분)';fixed++;}
+    if(j.no==='ADJ03'){j.dt='3/18';j.no='S0901';j.desc='유가증권 취득원가 정정(수수료분)';fixed++;}
+    if(j.no==='ADJ04'){j.dt='3/9';j.no='S0902';j.desc='매각이익 반올림 조정';fixed++;}
+  });
+  if(fixed>0){saveD();toast(fixed+'건 조정전표 정정 완료');go('jrn');}
+  else{toast('수정할 조정전표가 없습니다','info');}
+}
+
 // ===== Toast Notification =====
 function toast(msg,type){
   type=type||'success';
@@ -2068,7 +2082,7 @@ function rTxTab(){
   // Japan corporate tax structure for small company (자본금 1억이하, 소득800만이하)
   const houjinzei=oi>0?Math.round(oi*0.15):0; // 법인세 15% (800만이하)
   const chihou_houjin=Math.round(houjinzei*0.103); // 지방법인세 10.3%
-  // 사업세: 누진세율 (자본금1억이하, 3단계)
+  // 사업세: 누진세율 (자본금1억엔이하, 3단계)
   var jigyouzei=0;
   if(oi>0){
     if(oi<=4000000) jigyouzei=Math.round(oi*0.035);
@@ -2088,7 +2102,7 @@ function rTxTab(){
     '<div style="height:8px"></div>'+
     '<div class="fr h" style="color:#1e3a5f"><span>① 국세</span></div>'+
     '<div class="fr i"><span>법인세 (15%)</span><span class="m">'+fm(houjinzei)+'</span></div>'+
-    '<div class="fr i" style="font-size:10px;color:#64748b"><span>　※자본금1억이하·소득800만이하 경감세율</span></div>'+
+    '<div class="fr i" style="font-size:10px;color:#64748b"><span>　※자본금1억엔이하·소득800만이하 경감세율</span></div>'+
     '<div class="fr i"><span>지방법인세 (법인세×10.3%)</span><span class="m">'+fm(chihou_houjin)+'</span></div>'+
     '<div style="height:6px"></div>'+
     '<div class="fr h" style="color:#d97706"><span>② 도도부현세 (도쿄도)</span></div>'+
@@ -2104,7 +2118,7 @@ function rTxTab(){
     '<div class="ib" style="font-size:9px">💡 참고용 추정치입니다. 실제 세액은 세무사 확인이 필요합니다.<br>'+
     '사업세는 손금산입 가능하나 여기서는 미반영. 결손금 이월공제 미반영.</div>'+
     '<div style="margin-top:10px;padding:10px;background:#f8fafc;border:1px solid #e2e6ed;border-radius:6px;font-size:10px">'+
-    '<div style="font-weight:600;margin-bottom:6px">📋 법인사업세 누진세율 (자본금1억이하)</div>'+
+    '<div style="font-weight:600;margin-bottom:6px">📋 법인사업세 누진세율 (자본금1억엔이하)</div>'+
     '<table style="font-size:10px;width:100%"><thead><tr><th style="text-align:left">과세소득</th><th style="text-align:right">세율</th></tr></thead><tbody>'+
     '<tr><td>400만엔 이하</td><td style="text-align:right">3.5%</td></tr>'+
     '<tr><td>400만~800만엔</td><td style="text-align:right">5.3%</td></tr>'+
@@ -2129,6 +2143,8 @@ function cP(v){let{d,p,o,f}=cS;if(v==='C'){d="0";p=null;o=null;f=true;}else if([
 
 document.addEventListener('DOMContentLoaded',function(){
   go('dash');updateNavLabels();
+  // Auto-fix ADJ entries
+  if(D.journals.some(function(j){return j.no&&j.no.startsWith('ADJ');})){fixAdjEntries();}
   document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>go(el.dataset.page)));
   const ks=['C','±','%','÷','7','8','9','×','4','5','6','-','1','2','3','+','0','0','.','='];
   const kd=document.getElementById('cK');
