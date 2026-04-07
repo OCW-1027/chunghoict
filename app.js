@@ -1,5 +1,5 @@
 // ===== STORAGE =====
-const DKEY='chungho_data', SKEY='chungho_settings';
+const DKEY='taesung_data', SKEY='taesung_settings';
 // DEF_SET defined above
 function loadJ(k,def){try{const v=localStorage.getItem(k);return v?{...def,...JSON.parse(v)}:def;}catch(e){return def;}}
 // SET defined above
@@ -25,7 +25,7 @@ function nid(){return Date.now()+Math.floor(Math.random()*1000);}
 
 
 // ===== PIN LOCK =====
-const PIN_KEY='chungho_pin';
+const PIN_KEY='taesung_pin';
 let pinBuffer='';
 let pinMode='unlock'; // 'unlock','setNew','confirmNew'
 let pinTemp='';
@@ -137,7 +137,7 @@ function fetchRate(){
       const krwRate=data.rates.KRW;
       SET.rates.USDJPY=Math.round(jpyRate*1000000)/1000000;
       SET.rates.JPYKRW=krwRate&&jpyRate?Math.round(krwRate/jpyRate*1000000)/1000000:SET.rates.JPYKRW;
-      localStorage.setItem('chungho_settings',JSON.stringify(SET));
+      localStorage.setItem('taesung_settings',JSON.stringify(SET));
       if(btn)btn.textContent='✅ 완료! USD/JPY: '+SET.rates.USDJPY;
       // Update settings page inputs if visible
       const r1=document.getElementById('r1');if(r1)r1.value=SET.rates.USDJPY;
@@ -195,7 +195,10 @@ function dynamicFS(){
   const evalAdj=evalLoss-journalEvalLoss; // 시가 조정액
   const secForBS=secBookVal-evalAdj; // 시가 반영 유가증권
   const cashT=deposit+secDep;
-  const totA=cashT+secForBS;
+  // Other assets (fixed assets, prepaid, etc.) — all asset accounts except 110, 191, 130
+  let otherAssets=0;
+  D.accts.filter(function(ac){return ac.g==='자산'&&ac.c!=='110'&&ac.c!=='191'&&ac.c!=='130';}).forEach(function(ac){otherAssets+=acctBal(ac.c);});
+  const totA=cashT+secForBS+otherAssets;
   // Liabilities + Equity: all from journals
   const liabCodes=['200','201','202','203','204','205','206','207','208','209','210','211','212','213','214','215','216','217','220','221','222','223','224','225','226','227','228'];
   let totL=0;liabCodes.forEach(c2=>{totL+=acctBal(c2);});
@@ -205,7 +208,7 @@ function dynamicFS(){
   // 이익잉여금 = journal retained + current period NI (if not yet closed)
   const eqNI=ni;
   const totE=capitalBal+retainedBal+eqNI;
-  return {sgaT,su,ol,noiT,evalLoss,interestPay,secFee,noeT,oi,ct,ni,deposit,secDep,secBookVal,secForBS,secMV,cashT,totA,totL,capitalBal,eqNI,totE,evalAdj};
+  return {sgaT,su,ol,noiT,evalLoss,interestPay,secFee,noeT,oi,ct,ni,deposit,secDep,secBookVal,secForBS,secMV,cashT,otherAssets,totA,totL,capitalBal,eqNI,totE,evalAdj};
 }
 
 
@@ -326,7 +329,7 @@ function renderTrendChart(period){
 
 
 // ===== FIREBASE SYNC =====
-const FB_DOC = 'chungho_main';
+const FB_DOC = 'taesung_main';
 const FB_COL = 'appdata';
 let fbReady = false;
 
@@ -879,7 +882,10 @@ function calc(){
   const tI=D.bkIn.reduce((s,d)=>s+d.amt,0),tO=D.bkOut.reduce((s,d)=>s+d.amt,0);
   const rpl=D.real.reduce((s,r)=>s+r.net,0),rC=D.real.reduce((s,r)=>s+r.tc,0),rS=D.real.reduce((s,r)=>s+r.sa,0);
   const bb=tI-tO,secDep=D.secDeposit||SEC_DEP,secBal=secDep+jpMv+usMv;
-  return {jpMv,jpC,usMv,usC,allMv:jpMv+usMv,allC:jpC+usC,allPl:jpMv+usMv-jpC-usC,rpl,rC,rS,tI,tO,bb,secDep,secBal,totA:bb+secBal};
+  // Include other asset balances (fixed assets etc.) for complete total
+  let otherA=0;
+  D.accts.filter(function(ac){return ac.g==='자산'&&ac.c!=='110'&&ac.c!=='191'&&ac.c!=='130';}).forEach(function(ac){otherA+=acctBal(ac.c);});
+  return {jpMv,jpC,usMv,usC,allMv:jpMv+usMv,allC:jpC+usC,allPl:jpMv+usMv-jpC-usC,rpl,rC,rS,tI,tO,bb,secDep,secBal,totA:bb+secBal+otherA};
 }
 
 function showModal(title,html){document.getElementById('modal').innerHTML='<div class="mo" onclick="closeModal()"><div class="mc" onclick="event.stopPropagation()"><h3>'+title+'</h3>'+html+'</div></div>';document.getElementById('modal').classList.remove('hidden');}
@@ -1090,7 +1096,7 @@ function exportWord(){
 <head><meta charset="utf-8">
 <style>@page{size:A4 landscape;margin:12mm} body{font-family:'Malgun Gothic',sans-serif;font-size:11pt;color:#1a2030}</style></head>
 <body>
-<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">ChunghoICT_운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
+<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
 
 <h2 style="font-size:13pt;color:#1e3a5f;border-bottom:2pt solid #1e3a5f;padding-bottom:4pt">1. 총자산내역</h2>
 <table ${T}><tr><td style="${TH}">구분</td><td style="${THR}">내역(엔)</td><td style="${TH}">비고</td></tr>
@@ -1130,12 +1136,12 @@ ${realRows}
 <table style="width:48%;border-collapse:collapse;float:left"><tr><td colspan="4" style="${TH}${R}">출금 상세내역</td></tr><tr><td style="${TH}">일자</td><td style="${TH}">구분</td><td style="${THR}">출금액</td><td style="${THR}">누적</td></tr>${bkOutRows}
 <tr><td colspan="2" style="${S}background:#e8e8e8;font-weight:bold;text-align:right">잔액</td><td colspan="2" style="${HB}background:#e8e8e8;color:#2563eb;font-size:12pt">${fm(c.bb)}</td></tr></table>
 <div style="clear:both"></div>
-<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 ChunghoICT 재무관리 프로그램에서 자동 생성되었습니다.</p>
+<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 태성㈜ 재무관리 프로그램에서 자동 생성되었습니다.</p>
 </body></html>`;
 
   const blob=new Blob([wordHTML],{type:'application/msword'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
-  a.href=url;a.download='ChunghoICT_運用報告書_'+new Date().toISOString().slice(0,10)+'.doc';
+  a.href=url;a.download='태성_자금운용보고서_'+new Date().toISOString().slice(0,10)+'.doc';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
@@ -1896,7 +1902,7 @@ function rFS(){
   ].filter(x=>x.a>0);
 
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="pt">재무제표</div><button class="bt" onclick="exportFSWord()" style="background:#2563eb;font-size:11px">📥 워드 내보내기 (日本語)</button></div><div class="tabs"><button class="tab on" data-tab="pl">손익계산서</button><button class="tab" data-tab="bs">대차대조표</button><button class="tab" data-tab="tx">법인세추정</button><button class="tab" data-tab="monthly" onclick="showMonthlyTab(this)">월차추이</button><button class="tab" data-tab="expense" onclick="showExpenseTab(this)">비용분석</button><button class="tab" data-tab="cashflow">현금흐름</button><button class="tab" data-tab="taxsum">소비세</button><button class="tab" data-tab="withholding">원천징수</button></div>'+
-  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">ChunghoICT Japan (단위:엔)</div></div>'+
+  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">태성주식회사 (단위:엔)</div></div>'+
   '<div class="fr"><span>Ⅰ 매출액</span><span class="m">0</span></div><div class="fr b"><span>매출총이익</span><span class="m">0</span></div><div style="height:8px"></div>'+
   '<div class="fr h"><span>Ⅱ 판매비와 일반관리비</span></div>'+
   sga.map(s=>'<div class="fr i"><span>'+s.nm+(s.n?' <span style="font-size:10px;color:#64748b">('+s.n+')</span>':'')+'</span><span class="m">'+fm(s.a)+'</span></div>').join('')+
@@ -1995,7 +2001,7 @@ function rRpt(){const c=calc();
   D.bkOut.forEach((d,i)=>{cO+=d.amt;bkOutRows+='<tr class="'+(i%2?'a':'')+'"><td class="mu m">'+d.dt+'</td><td>'+d.cat+'</td><td class="r m rd">'+fm(d.amt)+'</td><td class="r m">'+fm(cO)+'</td></tr>';});
 
   return '<div style="max-width:1100px" id="rptContent">'+
-    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">ChunghoICT_운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
+    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
     '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="bt" onclick="window.print()">🖨 인쇄 (A4)</button><button class="bt" onclick="exportWord()" style="background:#2563eb">📥 워드 내보내기</button><button class="bt" onclick="saveRptEdits()" style="background:#059669">💾 편집 저장</button><button class="bt gh" onclick="clearRptEdits()">🔄 원본 복원</button></div>'+
 
     // 1. 총자산내역
@@ -2062,7 +2068,7 @@ function rRpt(){const c=calc();
 // ===== DATA BACKUP / RESTORE =====
 function exportBackup(){
   const backup={
-    version:'chungho_v26',
+    version:'taesung_v26',
     exportDate:new Date().toISOString(),
     data:D,
     settings:SET,
@@ -2073,7 +2079,7 @@ function exportBackup(){
   const url=URL.createObjectURL(blob);
   const a2=document.createElement('a');
   a2.href=url;
-  a2.download='chungho_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a2.download='taesung_backup_'+new Date().toISOString().slice(0,10)+'.json';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
   URL.revokeObjectURL(url);
   alert('백업 완료!\n파일: '+a2.download);
@@ -2322,6 +2328,7 @@ function exportFSWord(){
 <tr><td>　証券預り金</td><td class="r">${fm(d.secDep)}</td><td></td><td></td></tr>
 <tr class="sub"><td>　現金・預金計</td><td></td><td class="r b">${fm(d.cashT)}</td><td></td></tr>
 <tr class="sub"><td>　有価証券（時価）</td><td></td><td class="r b">${fm(d.secMV)}</td><td></td></tr>
+${(function(){var rows='';D.accts.filter(function(ac){return ac.g==='자산'&&ac.c!=='110'&&ac.c!=='191'&&ac.c!=='130';}).forEach(function(ac){var b=acctBal(ac.c);if(b!==0)rows+='<tr><td>　'+ac.n+'</td><td class="r">'+fm(b)+'</td><td></td><td></td></tr>';});return rows;})()}
 <tr class="total"><td>資産合計</td><td></td><td></td><td class="r" style="font-size:11pt">${fm(d.totA)}</td></tr>
 <tr class="gap"><td colspan="4"></td></tr>
 
@@ -3319,6 +3326,96 @@ function delContract(id){
 
 // --- 자산관리 탭별 렌더링 ---
 
+// --- 감가상각 전표 자동생성 ---
+function genDepJournals(ym){
+  if(!ym){toast('연월을 선택하세요','warn');return;}
+  var parts=ym.split('-');
+  var yr=parseInt(parts[0]),mo=parseInt(parts[1]);
+  var moStr=mo+'/1'; // 전표 날짜 형식
+  var dtFull=ym; // edt(편집날짜) 형식
+  var activeFA=(D.fixedAssets||[]).filter(function(a){return !a.disposed;});
+  if(activeFA.length===0){toast('감가상각 대상 자산이 없습니다','warn');return;}
+  // 중복 체크: 해당 월에 이미 감가상각 전표가 있는지
+  var dupTag='[감가상각_'+ym+']';
+  var existing=D.journals.filter(function(j){return j.desc&&j.desc.indexOf(dupTag)>=0;});
+  if(existing.length>0){
+    if(!confirm('⚠️ '+ym+' 감가상각 전표가 이미 '+existing.length+'건 있습니다.\n중복 생성하시겠습니까?')) return;
+  }
+  var count=0,totalAmt=0;
+  var _batchId=nid();
+  activeFA.forEach(function(a){
+    var dep=calcDepreciation(a);
+    if(dep.monthly<=0) return; // 상각 완료
+    // 취득일 이전 월은 스킵
+    var acqParts=a.acquiredDate.split('-');
+    var acqYM=parseInt(acqParts[0])*100+parseInt(acqParts[1]);
+    var targetYM=yr*100+mo;
+    if(targetYM<acqYM) return;
+    var slipNo=genSlipNo(dtFull,'529',a.acctCode);
+    var acctName=(D.accts.find(function(ac){return ac.c===a.acctCode;})||{}).k||a.acctCode;
+    D.journals.push({
+      id:nid(),dt:moStr,no:slipNo,
+      desc:a.name+' 감가상각 ('+acctName+') '+dupTag,
+      dr:'529',cr:a.acctCode,amt:dep.monthly,
+      edt:dtFull+'-28',pdt:dtFull+'-28',cur:'JPY',exp:'',vendor:'',taxCls:''
+    });
+    count++;totalAmt+=dep.monthly;
+  });
+  if(count>0){
+    saveD();
+    toast(ym+' 감가상각 전표 '+count+'건 생성 (합계 '+totalAmt.toLocaleString()+'엔)');
+    go('asset');
+  } else {
+    toast('생성할 감가상각 전표가 없습니다 (모두 상각 완료 또는 미취득)','warn');
+  }
+}
+
+// --- 리스/렌탈 전표 자동생성 ---
+function genLeaseJournals(ym){
+  if(!ym){toast('연월을 선택하세요','warn');return;}
+  var parts=ym.split('-');
+  var yr=parseInt(parts[0]),mo=parseInt(parts[1]);
+  var moStr=mo+'/1';
+  var dtFull=ym;
+  var activeLS=(D.leases||[]).filter(function(l){return l.active;});
+  if(activeLS.length===0){toast('활성 리스/렌탈이 없습니다','warn');return;}
+  // 중복 체크
+  var dupTag='[리스_'+ym+']';
+  var existing=D.journals.filter(function(j){return j.desc&&j.desc.indexOf(dupTag)>=0;});
+  if(existing.length>0){
+    if(!confirm('⚠️ '+ym+' 리스/렌탈 전표가 이미 '+existing.length+'건 있습니다.\n중복 생성하시겠습니까?')) return;
+  }
+  var count=0,totalAmt=0;
+  var today=new Date(yr,mo-1,28);
+  activeLS.forEach(function(l){
+    // 계약기간 체크
+    if(l.startDate){
+      var sd=new Date(l.startDate);
+      if(today<sd) return; // 아직 시작 안됨
+    }
+    if(l.endDate){
+      var ed=new Date(l.endDate);
+      if(today>ed) return; // 이미 종료
+    }
+    var slipNo=genSlipNo(dtFull,l.acctCode,'110');
+    var typeLabel=l.type==='lease'?'리스료':'렌탈료';
+    D.journals.push({
+      id:nid(),dt:moStr,no:slipNo,
+      desc:l.name+' '+typeLabel+' '+dupTag,
+      dr:l.acctCode,cr:'110',amt:l.monthlyAmt,
+      edt:dtFull+'-28',pdt:dtFull+'-28',cur:'JPY',exp:'',vendor:l.vendor||'',taxCls:''
+    });
+    count++;totalAmt+=l.monthlyAmt;
+  });
+  if(count>0){
+    saveD();
+    toast(ym+' 리스/렌탈 전표 '+count+'건 생성 (합계 '+totalAmt.toLocaleString()+'엔)');
+    go('asset');
+  } else {
+    toast('생성할 리스/렌탈 전표가 없습니다 (계약기간 외)','warn');
+  }
+}
+
 function rFATab(){
   // 고정자산대장
   var acctOpts=ACCT_INIT.filter(function(ac){return ac.c>='160'&&ac.c<='185';}).map(function(ac){return '<option value="'+ac.c+'">'+ac.c+' '+ac.k+'</option>';}).join('');
@@ -3379,6 +3476,28 @@ function rFATab(){
 
   // 감가상각 참고표
   html+='<div class="ib" style="margin-top:14px;font-size:10px">💡 <b>일본 감가상각 기준:</b> 잔존가액 = 비망가액 1엔 (税法基準). 정액법: 매년 균등 상각. 정률법: 200%정률법 (取得日 기준). 내용연수 예시: PC 4년, 차량 6년, 건물(목조) 22년, 건물(RC) 47년, 비품 5~15년</div>';
+
+  // 전표 자동생성 버튼
+  if(activeItems.length>0){
+    var nowYM=new Date().toISOString().slice(0,7);
+    html+='<div class="pn" style="margin-top:14px;padding:14px"><div style="font-size:13px;font-weight:700;margin-bottom:10px">📋 감가상각 전표 자동생성</div>';
+    html+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    html+='<input type="month" id="fa_genMonth" value="'+nowYM+'" style="padding:5px 8px;border:1px solid #e2e6ed;border-radius:5px;font-size:12px">';
+    html+='<button class="bt" onclick="genDepJournals(document.getElementById(\'fa_genMonth\').value)">DR 529 감가상각비 전표 생성</button>';
+    html+='<span style="font-size:10px;color:#64748b">선택한 월의 감가상각비 전표를 일괄 생성합니다 (DR 529 / CR 자산계정)</span>';
+    html+='</div>';
+    // 생성 이력 표시
+    var depJournals=D.journals.filter(function(j){return j.desc&&j.desc.indexOf('[감가상각_')>=0;});
+    if(depJournals.length>0){
+      html+='<div style="margin-top:10px;font-size:10px;color:#64748b"><b>생성 이력:</b> ';
+      var months={};
+      depJournals.forEach(function(j){var m=j.desc.match(/\[감가상각_(\d{4}-\d{2})\]/);if(m)months[m[1]]=(months[m[1]]||0)+1;});
+      Object.keys(months).sort().forEach(function(m){html+=m+'('+months[m]+'건) ';});
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+
   return html;
 }
 
@@ -3447,6 +3566,28 @@ function rLeaseTab(){
   }
 
   html+='<div class="ib" style="margin-top:14px;font-size:10px">💡 <b>리스 vs 렌탈:</b> 리스 = 장기 계약(보통 3~7년), 중도해지 불가. 렌탈 = 단기 계약, 해지 자유. 비용계정: 리스→548(リース料), 렌탈→526(地代家賃)으로 분류</div>';
+
+  // 전표 자동생성 버튼
+  if(activeItems.length>0){
+    var nowYM=new Date().toISOString().slice(0,7);
+    html+='<div class="pn" style="margin-top:14px;padding:14px"><div style="font-size:13px;font-weight:700;margin-bottom:10px">📋 리스/렌탈 전표 자동생성</div>';
+    html+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    html+='<input type="month" id="ls_genMonth" value="'+nowYM+'" style="padding:5px 8px;border:1px solid #e2e6ed;border-radius:5px;font-size:12px">';
+    html+='<button class="bt gn" onclick="genLeaseJournals(document.getElementById(\'ls_genMonth\').value)">DR 리스료/임차료 전표 생성</button>';
+    html+='<span style="font-size:10px;color:#64748b">선택한 월의 활성 리스/렌탈 전표를 일괄 생성합니다 (DR 비용계정 / CR 110 보통예금)</span>';
+    html+='</div>';
+    // 생성 이력
+    var leaseJournals=D.journals.filter(function(j){return j.desc&&j.desc.indexOf('[리스_')>=0;});
+    if(leaseJournals.length>0){
+      html+='<div style="margin-top:10px;font-size:10px;color:#64748b"><b>생성 이력:</b> ';
+      var months={};
+      leaseJournals.forEach(function(j){var m=j.desc.match(/\[리스_(\d{4}-\d{2})\]/);if(m)months[m[1]]=(months[m[1]]||0)+1;});
+      Object.keys(months).sort().forEach(function(m){html+=m+'('+months[m]+'건) ';});
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+
   return html;
 }
 
@@ -3608,7 +3749,7 @@ function rTxTab(){
   
   return '<div class="pn" style="padding:18px;max-width:520px">'+
     '<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:4px">법인세 등 추정 상세</div>'+
-    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">ChunghoICT Japan (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
+    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">태성주식회사 (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
     '<div class="fr h"><span>경상이익 (과세소득)</span><span class="m">'+fm(oi)+'</span></div>'+
     '<div style="height:8px"></div>'+
     '<div class="fr h" style="color:#1e3a5f"><span>① 국세</span></div>'+
