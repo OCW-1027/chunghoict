@@ -1,3 +1,4 @@
+// ===== COMPLETE JAPANESE CHART OF ACCOUNTS (200+) =====
 const ACCT_INIT = [
 // 流動資産 (Current Assets)
 {c:"100",n:"現金",k:"현금",g:"자산"},{c:"101",n:"小口現金",k:"소액현금",g:"자산"},
@@ -62,11 +63,10 @@ const ACCT_INIT = [
 {c:"408",n:"受取家賃",k:"수취임대료",g:"수익"},{c:"409",n:"受取ロイヤリティ",k:"수취로열티",g:"수익"},
 {c:"410",n:"仕入割引",k:"매입할인",g:"수익"},{c:"411",n:"償却債権取立益",k:"상각채권회수이익",g:"수익"},
 {c:"412",n:"保険差益",k:"보험차익",g:"수익"},{c:"413",n:"貸倒引当金戻入",k:"대손충당금환입",g:"수익"},
-// 費用 (Expenses) - 매출원가
+// 費用 (Expenses)
 {c:"500",n:"仕入高",k:"매입",g:"비용",p:"c"},{c:"501",n:"外注加工費",k:"외주가공비",g:"비용",p:"c"},
 {c:"502",n:"材料費",k:"재료비",g:"비용",p:"c"},{c:"503",n:"労務費",k:"노무비",g:"비용",p:"c"},
 {c:"504",n:"製造経費",k:"제조경비",g:"비용",p:"c"},
-// 費用 - 판관비
 {c:"510",n:"役員報酬",k:"임원보수",g:"비용",p:"s"},{c:"511",n:"給料手当",k:"급여수당",g:"비용",p:"s"},
 {c:"512",n:"賞与",k:"상여",g:"비용",p:"s"},{c:"513",n:"法定福利費",k:"법정복리비",g:"비용",p:"s"},
 {c:"514",n:"福利厚生費",k:"복리후생비",g:"비용",p:"s"},{c:"515",n:"退職金",k:"퇴직금",g:"비용",p:"s"},
@@ -100,7 +100,7 @@ const ACCT_INIT = [
 {c:"584",n:"貸倒引当金繰入",k:"대손충당금전입",g:"비용",p:"s"},
 ];
 
-// ===== EMPTY DATA (DEMO) =====
+// ===== EMPTY DATA (ChunghoICT) =====
 const INIT_JOURNALS = [];
 const INIT_HOLD_JP = [];
 const INIT_HOLD_US = [];
@@ -109,8 +109,7 @@ const INIT_BK_IN = [];
 const INIT_BK_OUT = [];
 const FS = {sga:[],sgaT:0,su:0,ol:0,noi:[],noiT:0,noe:[],noeT:0,oi:0,ct:0,ni:0,ast:[],cashT:0,secMV:0,totA:0,lib:[],totL:0,eq:[],totE:0,tax:[],taxT:0,taxP:0,taxF:0,taxD:0,feeSum:{bC:0,bT:0,bTot:0,sC:0,sT:0,sTot:0,tC:0,tT:0,gT:0}};
 const SEC_DEP = 0;
-const INIT_VENDORS = [];
-
-const DEF_SET={rates:{USDJPY:149.50,JPYKRW:9.12},reportDate:''};
+const DEF_SET={rates:{USDJPY:150,JPYKRW:9},reportDate:''};
 let SET;
 try{const sv=localStorage.getItem('chungho_settings');SET=sv?{...DEF_SET,...JSON.parse(sv),rates:{...DEF_SET.rates,...(JSON.parse(sv).rates||{})}}:{...DEF_SET};}catch(e){SET={...DEF_SET};}
+const INIT_VENDORS=[];
