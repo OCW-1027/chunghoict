@@ -1,5 +1,5 @@
 // ===== STORAGE =====
-const DKEY='taesung_data', SKEY='taesung_settings';
+const DKEY='chungho_data', SKEY='chungho_settings';
 // DEF_SET defined above
 function loadJ(k,def){try{const v=localStorage.getItem(k);return v?{...def,...JSON.parse(v)}:def;}catch(e){return def;}}
 // SET defined above
@@ -25,7 +25,7 @@ function nid(){return Date.now()+Math.floor(Math.random()*1000);}
 
 
 // ===== PIN LOCK =====
-const PIN_KEY='taesung_pin';
+const PIN_KEY='chungho_pin';
 let pinBuffer='';
 let pinMode='unlock'; // 'unlock','setNew','confirmNew'
 let pinTemp='';
@@ -137,7 +137,7 @@ function fetchRate(){
       const krwRate=data.rates.KRW;
       SET.rates.USDJPY=Math.round(jpyRate*1000000)/1000000;
       SET.rates.JPYKRW=krwRate&&jpyRate?Math.round(krwRate/jpyRate*1000000)/1000000:SET.rates.JPYKRW;
-      localStorage.setItem('taesung_settings',JSON.stringify(SET));
+      localStorage.setItem('chungho_settings',JSON.stringify(SET));
       if(btn)btn.textContent='✅ 완료! USD/JPY: '+SET.rates.USDJPY;
       // Update settings page inputs if visible
       const r1=document.getElementById('r1');if(r1)r1.value=SET.rates.USDJPY;
@@ -329,7 +329,7 @@ function renderTrendChart(period){
 
 
 // ===== FIREBASE SYNC =====
-const FB_DOC = 'taesung_main';
+const FB_DOC = 'chungho_main';
 const FB_COL = 'appdata';
 let fbReady = false;
 
@@ -1096,7 +1096,7 @@ function exportWord(){
 <head><meta charset="utf-8">
 <style>@page{size:A4 landscape;margin:12mm} body{font-family:'Malgun Gothic',sans-serif;font-size:11pt;color:#1a2030}</style></head>
 <body>
-<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
+<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">ChunghoICT_운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
 
 <h2 style="font-size:13pt;color:#1e3a5f;border-bottom:2pt solid #1e3a5f;padding-bottom:4pt">1. 총자산내역</h2>
 <table ${T}><tr><td style="${TH}">구분</td><td style="${THR}">내역(엔)</td><td style="${TH}">비고</td></tr>
@@ -1136,12 +1136,12 @@ ${realRows}
 <table style="width:48%;border-collapse:collapse;float:left"><tr><td colspan="4" style="${TH}${R}">출금 상세내역</td></tr><tr><td style="${TH}">일자</td><td style="${TH}">구분</td><td style="${THR}">출금액</td><td style="${THR}">누적</td></tr>${bkOutRows}
 <tr><td colspan="2" style="${S}background:#e8e8e8;font-weight:bold;text-align:right">잔액</td><td colspan="2" style="${HB}background:#e8e8e8;color:#2563eb;font-size:12pt">${fm(c.bb)}</td></tr></table>
 <div style="clear:both"></div>
-<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 태성㈜ 재무관리 프로그램에서 자동 생성되었습니다.</p>
+<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 ChunghoICT 재무관리 프로그램에서 자동 생성되었습니다.</p>
 </body></html>`;
 
   const blob=new Blob([wordHTML],{type:'application/msword'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
-  a.href=url;a.download='태성_자금운용보고서_'+new Date().toISOString().slice(0,10)+'.doc';
+  a.href=url;a.download='ChunghoICT_運用報告書_'+new Date().toISOString().slice(0,10)+'.doc';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
@@ -1268,7 +1268,26 @@ const edt=document.getElementById('sl_edt').value,pdt=document.getElementById('s
   // vendor is optional
   // Check all rows have 원가구분
   // 원가구분 optional
-const mo=String(parseInt(edt.split('-')[1]||'1'));const dt=mo+'/'+String(parseInt(edt.split('-')[2]||'1'));const no=genSlipNo(edt,rows[0]?rows[0].ac:'',rows[1]?rows[1].ac:'');const drRows=rows.filter(r=>r.side==='dr'),crRows=rows.filter(r=>r.side==='cr');var _newSlipId=nid();if(!window._editSlipId&&!confirm('전표를 생성하시겠습니까?\n\n적요: '+desc+'\n금액: '+fm(dr)))return;drRows.forEach(d=>{crRows.forEach(c=>{const ratio=c.amt/cr,amt=Math.round(d.amt*ratio);var tC=d.taxCls||c.taxCls||'';if(window._editSlipId){var ej=D.journals.find(x=>x.id===window._editSlipId);if(ej){saveUndo('edit',ej);ej.dt=dt;ej.desc=desc;ej.dr=d.ac;ej.cr=c.ac;ej.amt=amt;ej.edt=edt;ej.pdt=pdt;ej.cur=cur;ej.exp=d.exp||c.exp;ej.vendor=vendor;ej.taxCls=tC;}window._editSlipId=null;}else{var newJ={id:_newSlipId,dt,no,desc,dr:d.ac,cr:c.ac,amt,edt,pdt,cur,exp:d.exp||c.exp,vendor:vendor,taxCls:tC};D.journals.push(newJ);saveUndo('create',newJ);}});});saveD();toast(window._editSlipId?'전표 수정 완료':'전표 생성 완료: '+desc);go('slip');window.scrollTo(0,0);}
+const mo=String(parseInt(edt.split('-')[1]||'1'));const dt=mo+'/'+String(parseInt(edt.split('-')[2]||'1'));const no=genSlipNo(edt,rows[0]?rows[0].ac:'',rows[1]?rows[1].ac:'');const drRows=rows.filter(r=>r.side==='dr'),crRows=rows.filter(r=>r.side==='cr');var _newSlipId=nid();if(!window._editSlipId&&!confirm('전표를 생성하시겠습니까?\n\n적요: '+desc+'\n금액: '+fm(dr)))return;drRows.forEach(d=>{crRows.forEach(c=>{const ratio=c.amt/cr,amt=Math.round(d.amt*ratio);var tC=d.taxCls||c.taxCls||'';if(window._editSlipId){var ej=D.journals.find(x=>x.id===window._editSlipId);if(ej){saveUndo('edit',ej);ej.dt=dt;ej.desc=desc;ej.dr=d.ac;ej.cr=c.ac;ej.amt=amt;ej.edt=edt;ej.pdt=pdt;ej.cur=cur;ej.exp=d.exp||c.exp;ej.vendor=vendor;ej.taxCls=tC;}window._editSlipId=null;}else{
+// 세빼기: 과세거래 자동분리 (본체 + 소비세)
+var mainAmt=amt,taxAmt=0;
+if(tC==='과세10%'||tC==='경감8%'){
+  var rate=tC==='경감8%'?8:10;
+  taxAmt=Math.round(amt*rate/(100+rate));
+  mainAmt=amt-taxAmt;
+}
+var newJ={id:_newSlipId,dt,no,desc,dr:d.ac,cr:c.ac,amt:mainAmt,edt,pdt,cur,exp:d.exp||c.exp,vendor:vendor,taxCls:tC};D.journals.push(newJ);saveUndo('create',newJ);
+// 소비세 분리 전표 자동생성
+if(taxAmt>0){
+  var drAcct=D.accts.find(function(a){return a.c===d.ac;});
+  var crAcct=D.accts.find(function(a){return a.c===c.ac;});
+  var taxDr=(drAcct&&drAcct.g==='비용')?'154':d.ac; // 비용→가지급소비세
+  var taxCr=(crAcct&&crAcct.g==='수익')?'211':c.ac; // 수익→가수소비세
+  var taxNo=genSlipNo(edt,taxDr,taxCr);
+  var taxJ={id:nid(),dt:dt,no:taxNo,desc:'[소비세] '+desc,dr:taxDr,cr:taxCr,amt:taxAmt,edt:edt,pdt:pdt,cur:cur,exp:'',vendor:vendor,taxCls:tC};
+  D.journals.push(taxJ);
+}
+}});});saveD();toast(window._editSlipId?'전표 수정 완료':'전표 생성 완료: '+desc);go('slip');window.scrollTo(0,0);}
 function addAcct(){showModal('계정과목 추가',`<div class="fg"><div><label>코드</label><input id="fa_c"></div><div><label>과목명(한국어)</label><input id="fa_k"></div><div><label>과목명(일본어)</label><input id="fa_n"></div><div><label>구분</label><select id="fa_g"><option value="자산">자산</option><option value="부채">부채</option><option value="순자산">순자산</option><option value="수익">수익</option><option value="비용">비용</option></select></div><div class="full" style="display:flex;gap:8px;justify-content:flex-end"><button class="bt gh" onclick="closeModal()">취소</button><button class="bt" onclick="doAddAcct()">추가</button></div><div class="full" style="font-size:10px;color:#64748b">현재 ${D.accts.length}개 과목</div></div>`);}
 function doAddAcct(){const c=document.getElementById('fa_c').value,k=document.getElementById('fa_k').value,n=document.getElementById('fa_n').value||k,g=document.getElementById('fa_g').value;if(!c||!k)return alert('코드와 과목명을 입력하세요');if(D.accts.find(x=>x.c===c))return alert('이미 존재하는 코드입니다');var newAcct={c,n,k,g};D.accts.push(newAcct);if(!D.customAccts)D.customAccts=[];
 if(D._oiAccts)OI_ACCTS=D._oiAccts;D.customAccts.push(newAcct);saveD();closeModal();toast('계정과목 추가: '+c+' '+k);go('slip');}
@@ -1685,10 +1704,10 @@ function getAlerts(){
   // 5) 법인세 확정신고 (결산일+2개월 = 7/31)
   var dJul31=daysUntil(7,31);
   if(dJul31<=30 && dJul31>0){
-    addAlert('🏛','법인세 확정신고 (7/31)','세무사에게 재무제표 · 총계정원장 전달',dJul31,'urgent');
+    addAlert('🏛','법인세·소비세 확정신고 (7/31)','세무사에게 재무제표 · 총계정원장 · 소비세 집계 전달',dJul31,'urgent');
   }
   if(dJul31<=60 && dJul31>30){
-    addAlert('🏛','법인세 신고 준비','워드/엑셀 내보내기 → 세무사 전달 준비',dJul31,'warn');
+    addAlert('🏛','법인세·소비세 신고 준비','워드/엑셀 내보내기 → 세무사 전달 준비 (소비세 포함)',dJul31,'warn');
   }
 
   // 6) 법인도민세(균등할) — 매년 8/31 납부 (도쿄도)
@@ -1902,7 +1921,7 @@ function rFS(){
   ].filter(x=>x.a>0);
 
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="pt">재무제표</div><button class="bt" onclick="exportFSWord()" style="background:#2563eb;font-size:11px">📥 워드 내보내기 (日本語)</button></div><div class="tabs"><button class="tab on" data-tab="pl">손익계산서</button><button class="tab" data-tab="bs">대차대조표</button><button class="tab" data-tab="tx">법인세추정</button><button class="tab" data-tab="monthly" onclick="showMonthlyTab(this)">월차추이</button><button class="tab" data-tab="expense" onclick="showExpenseTab(this)">비용분석</button><button class="tab" data-tab="cashflow">현금흐름</button><button class="tab" data-tab="taxsum">소비세</button><button class="tab" data-tab="withholding">원천징수</button></div>'+
-  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">태성주식회사 (단위:엔)</div></div>'+
+  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">ChunghoICT Japan (단위:엔)</div></div>'+
   '<div class="fr"><span>Ⅰ 매출액</span><span class="m">0</span></div><div class="fr b"><span>매출총이익</span><span class="m">0</span></div><div style="height:8px"></div>'+
   '<div class="fr h"><span>Ⅱ 판매비와 일반관리비</span></div>'+
   sga.map(s=>'<div class="fr i"><span>'+s.nm+(s.n?' <span style="font-size:10px;color:#64748b">('+s.n+')</span>':'')+'</span><span class="m">'+fm(s.a)+'</span></div>').join('')+
@@ -2001,7 +2020,7 @@ function rRpt(){const c=calc();
   D.bkOut.forEach((d,i)=>{cO+=d.amt;bkOutRows+='<tr class="'+(i%2?'a':'')+'"><td class="mu m">'+d.dt+'</td><td>'+d.cat+'</td><td class="r m rd">'+fm(d.amt)+'</td><td class="r m">'+fm(cO)+'</td></tr>';});
 
   return '<div style="max-width:1100px" id="rptContent">'+
-    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
+    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">ChunghoICT_운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
     '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="bt" onclick="window.print()">🖨 인쇄 (A4)</button><button class="bt" onclick="exportWord()" style="background:#2563eb">📥 워드 내보내기</button><button class="bt" onclick="saveRptEdits()" style="background:#059669">💾 편집 저장</button><button class="bt gh" onclick="clearRptEdits()">🔄 원본 복원</button></div>'+
 
     // 1. 총자산내역
@@ -2068,7 +2087,7 @@ function rRpt(){const c=calc();
 // ===== DATA BACKUP / RESTORE =====
 function exportBackup(){
   const backup={
-    version:'taesung_v26',
+    version:'chungho_v26',
     exportDate:new Date().toISOString(),
     data:D,
     settings:SET,
@@ -2079,7 +2098,7 @@ function exportBackup(){
   const url=URL.createObjectURL(blob);
   const a2=document.createElement('a');
   a2.href=url;
-  a2.download='taesung_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a2.download='chungho_backup_'+new Date().toISOString().slice(0,10)+'.json';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
   URL.revokeObjectURL(url);
   alert('백업 완료!\n파일: '+a2.download);
@@ -2212,7 +2231,7 @@ function exportGLExcel(){
     bal[j.cr].cr+=j.amt;bal[j.cr].entries.push({...j,isDr:false});
   });
   let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{mso-number-format:"\@"}</style></head><body>';
-  html+='<h2 style="font-size:14pt;color:#1e3a5f">泰成株式会社　総勘定元帳</h2>';
+  html+='<h2 style="font-size:14pt;color:#1e3a5f">ChunghoICT Japan株式会社　総勘定元帳</h2>';
   html+='<p style="font-size:9pt;color:#666">自 令和7年6月2日 至 令和8年4月2日（暫定）</p><br>';
   
   const groups={"자산":"資産","부채":"負債","순자산":"純資産","수익":"収益","비용":"費用"};
@@ -2236,7 +2255,7 @@ function exportGLExcel(){
   html+='</body></html>';
   const blob=new Blob([html],{type:'application/vnd.ms-excel'});
   const url=URL.createObjectURL(blob);const a2=document.createElement('a');
-  a2.href=url;a2.download='泰成_総勘定元帳_'+new Date().toISOString().slice(0,10)+'.xls';
+  a2.href=url;a2.download='ChunghoICT_総勘定元帳_'+new Date().toISOString().slice(0,10)+'.xls';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
@@ -2277,7 +2296,7 @@ function exportFSWord(){
   html+=`
 <div class="stamp"><div class="s1">決裁</div><div class="s2">本人専決</div></div>
 <h1>損 益 計 算 書</h1>
-<div class="sub">泰成株式会社<br>自 令和7年6月2日（設立日）至 令和8年4月2日（暫定）<br>（単位：円）</div>
+<div class="sub">ChunghoICT Japan株式会社<br>自 令和7年6月2日（設立日）至 令和8年4月2日（暫定）<br>（単位：円）</div>
 
 <table>
 <tr><th style="width:35%">科目</th><th class="r" style="width:20%">内訳</th><th class="r" style="width:20%">小計</th><th class="r" style="width:25%">合計</th></tr>
@@ -2318,7 +2337,7 @@ function exportFSWord(){
 
 <div class="stamp"><div class="s1">決裁</div><div class="s2">本人専決</div></div>
 <h1>貸 借 対 照 表</h1>
-<div class="sub">泰成株式会社<br>令和8年4月2日現在（暫定）<br>（単位：円）</div>
+<div class="sub">ChunghoICT Japan株式会社<br>令和8年4月2日現在（暫定）<br>（単位：円）</div>
 
 <table>
 <tr><th style="width:40%">科目</th><th class="r" style="width:20%">内訳</th><th class="r" style="width:20%">小計</th><th class="r" style="width:20%">合計</th></tr>
@@ -2348,12 +2367,12 @@ ${(function(){var rows='';D.accts.filter(function(ac){return ac.g==='자산'&&ac
 <tr class="total" style="background:#0d1b3e"><td>負債・純資産合計</td><td></td><td></td><td class="r" style="font-size:12pt">${fm(d.totL+d.totE)}</td></tr>
 </table>
 
-<div class="footer">泰成株式会社 財務管理システム ｜ 出力日: ${dateStr} ｜ 本書は暫定値に基づく参考資料です</div>
+<div class="footer">ChunghoICT Japan株式会社 財務管理システム ｜ 出力日: ${dateStr} ｜ 本書は暫定値に基づく参考資料です</div>
 </body></html>`;
 
   const blob=new Blob([html],{type:'application/msword'});
   const url=URL.createObjectURL(blob);const a2=document.createElement('a');
-  a2.href=url;a2.download='泰成_財務諸表_'+new Date().toISOString().slice(0,10)+'.doc';
+  a2.href=url;a2.download='ChunghoICT_財務諸表_'+new Date().toISOString().slice(0,10)+'.doc';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
@@ -2834,102 +2853,187 @@ function saveOIAccts(){
 }
 
 
-// ===== 소비세 집계표 =====
+// ===== 소비세 집계표 (일반과세·세빼기경리) =====
 function rTaxSummary(){
-  // Aggregate by taxCls field from journals
-  var cats={'과세10%':{dr:0,cr:0,cnt:0},'경감8%':{dr:0,cr:0,cnt:0},'비과세':{dr:0,cr:0,cnt:0},'불과세':{dr:0,cr:0,cnt:0},'미분류':{dr:0,cr:0,cnt:0}};
-  
+  // 154(가지급소비세) and 211(가수소비세) balances from journals
+  var inputTax=acctBal('154');  // 매입세액 (지급한 소비세)
+  var outputTax=acctBal('211'); // 매출세액 (받은 소비세)
+  var netTax=outputTax-inputTax; // 양수=납부, 음수=환급
+
+  // Breakdown by taxCls
+  var expCodes={};D.accts.filter(function(ac){return ac.g==='비용';}).forEach(function(ac){expCodes[ac.c]=true;});
+  var revCodes={};D.accts.filter(function(ac){return ac.g==='수익';}).forEach(function(ac){revCodes[ac.c]=true;});
+  var cats={'과세10%':{exp:0,rev:0,tax154:0,tax211:0,cnt:0},'경감8%':{exp:0,rev:0,tax154:0,tax211:0,cnt:0},'비과세':{exp:0,rev:0,cnt:0},'불과세':{exp:0,rev:0,cnt:0},'미분류':{exp:0,rev:0,cnt:0}};
   D.journals.forEach(function(j){
     var cls=j.taxCls||'미분류';
-    if(!cats[cls]) cats[cls]={dr:0,cr:0,cnt:0};
-    cats[cls].dr+=j.amt;
+    if(!cats[cls]) cats[cls]={exp:0,rev:0,tax154:0,tax211:0,cnt:0};
+    if(expCodes[j.dr]) cats[cls].exp+=j.amt;
+    if(revCodes[j.cr]) cats[cls].rev+=j.amt;
+    if(j.dr==='154') cats[cls].tax154=(cats[cls].tax154||0)+j.amt;
+    if(j.cr==='211') cats[cls].tax211=(cats[cls].tax211||0)+j.amt;
     cats[cls].cnt++;
   });
-  
-  // Monthly breakdown
-  var months=['06','07','08','09','10','11','12','01','02','03','04','05'];
-  var monthLabels=['6월','7월','8월','9월','10월','11월','12월','1월','2월','3월','4월','5월'];
-  var monthlyTax={};
-  months.forEach(function(m){monthlyTax[m]={'과세10%':0,'경감8%':0,'비과세':0,'불과세':0,'미분류':0};});
-  
-  D.journals.forEach(function(j){
-    var cls=j.taxCls||'미분류';
-    var m=j.dt.match(/(\d+)\//);
-    if(!m)return;
-    var mo=String(parseInt(m[1])).padStart(2,'0');
-    if(monthlyTax[mo]&&monthlyTax[mo][cls]!==undefined) monthlyTax[mo][cls]+=j.amt;
-  });
-  
-  var grandTotal=D.journals.reduce(function(s,j){return s+j.amt;},0);
-  
-  // Summary cards
-  var colors={'과세10%':'#2563eb','경감8%':'#7c3aed','비과세':'#059669','불과세':'#d97706','미분류':'#94a3b8'};
-  var html='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px">';
-  Object.keys(cats).forEach(function(cls){
-    var c=cats[cls];
-    var pct=grandTotal>0?((c.dr/grandTotal)*100).toFixed(1):'0';
-    html+='<div style="background:#fff;border:1px solid #e2e6ed;border-radius:8px;padding:8px;text-align:center;border-top:3px solid '+(colors[cls]||'#94a3b8')+'">';
-    html+='<div style="font-size:10px;color:'+(colors[cls]||'#94a3b8')+';font-weight:600">'+cls+'</div>';
-    html+='<div style="font-size:13px;font-weight:700;margin-top:2px">'+fm(c.dr)+'</div>';
-    html+='<div style="font-size:9px;color:#64748b">'+c.cnt+'건 ('+pct+'%)</div>';
-    html+='</div>';
-  });
-  html+='</div>';
-  
-  // Estimated tax amounts (for reference)
-  var taxable10=cats['과세10%'].dr;
-  var taxable8=cats['경감8%'].dr;
-  var estTax10=Math.round(taxable10*10/110);
-  var estTax8=Math.round(taxable8*8/108);
-  
-  html+='<div class="ib" style="font-size:11px;margin-bottom:10px">';
-  html+='<b>참고) 소비세 추정액:</b> ';
-  html+='과세10%분 → '+fm(estTax10)+' | 경감8%분 → '+fm(estTax8)+' | 합계 → '+fm(estTax10+estTax8);
-  html+='<br><span style="color:#d97706">⚠️ 제1기·제2기 면세사업자 — 매입세액공제 불가, 소비세 전액 비용처리</span>';
-  html+='</div>';
-  
-  // Monthly table
-  html+='<div style="overflow-x:auto"><table style="font-size:10px"><thead><tr><th style="min-width:80px">구분</th>';
-  monthLabels.forEach(function(l){html+='<th class="r">'+l+'</th>';});
-  html+='<th class="r" style="font-weight:700;background:#dbeafe">합계</th></tr></thead><tbody>';
-  
-  var clsList=['과세10%','경감8%','비과세','불과세','미분류'];
-  clsList.forEach(function(cls,ci){
-    var total=cats[cls].dr;
-    html+='<tr class="'+(ci%2?'a':'')+'"><td style="font-weight:600;color:'+(colors[cls]||'#64748b')+'">'+cls+'</td>';
-    months.forEach(function(m){
-      var v=monthlyTax[m][cls];
-      html+='<td class="r m">'+(v?fm(v):'')+'</td>';
+
+  // Check for un-migrated entries (세포함 entries that need splitting)
+  var unmigrated=D.journals.filter(function(j){
+    if(j.taxCls!=='과세10%'&&j.taxCls!=='경감8%') return false;
+    if(j.dr==='154'||j.cr==='211') return false; // already a tax entry
+    if(j.desc&&j.desc.indexOf('[소비세]')>=0) return false;
+    // Check if companion tax entry exists
+    var hasCompanion=D.journals.some(function(j2){
+      return j2.desc&&j2.desc.indexOf('[소비세]')>=0&&j2.dt===j.dt&&(j2.dr==='154'||j2.cr==='211');
     });
-    html+='<td class="r m b">'+fm(total)+'</td></tr>';
+    // Simple heuristic: if no 154/211 companion for this exact entry
+    return !hasCompanion;
   });
-  
-  // Total row
-  html+='<tr class="t"><td>합계</td>';
-  months.forEach(function(m){
-    var v=0;clsList.forEach(function(cls){v+=monthlyTax[m][cls]||0;});
-    html+='<td class="r m">'+fm(v)+'</td>';
-  });
-  html+='<td class="r m b">'+fm(grandTotal)+'</td></tr>';
-  html+='</tbody></table></div>';
-  
-  // Detail: taxable items list
-  html+='<div style="margin-top:12px"><div style="font-size:12px;font-weight:700;margin-bottom:6px">📋 과세거래 상세 (과세10% + 경감8%)</div>';
-  var taxableJ=D.journals.filter(function(j){return j.taxCls==='과세10%'||j.taxCls==='경감8%';});
-  if(taxableJ.length>0){
-    html+='<table><thead><tr><th>일자</th><th>전표</th><th>적요</th><th>구분</th><th class="r">금액</th><th class="r">추정세액</th></tr></thead><tbody>';
-    taxableJ.forEach(function(j,i){
-      var rate=j.taxCls==='경감8%'?8:10;
-      var tax=Math.round(j.amt*rate/(100+rate));
-      html+='<tr class="'+(i%2?'a':'')+'"><td class="mu m">'+j.dt+'</td><td style="color:#2563eb;font-size:10px">'+j.no+'</td><td>'+j.desc+'</td><td style="color:'+(colors[j.taxCls]||'#64748b')+';font-size:10px;font-weight:600">'+j.taxCls+'</td><td class="r m">'+fm(j.amt)+'</td><td class="r m" style="color:#d97706">'+fm(tax)+'</td></tr>';
+
+  // Header
+  var html='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:11px">';
+  html+='<b>📋 일반과세 (本則課税) · 세빼기 경리 (税抜経理方式)</b>';
+  html+='<br>자본금 1,000만엔 → 설립 제1기부터 과세사업자. 전표 기표 시 본체/소비세 자동분리.';
+  html+='<br>신고기한: 결산일 익일부터 2개월 이내 (7/31)';
+  html+='</div>';
+
+  // Migration warning
+  if(unmigrated.length>0){
+    html+='<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:14px">';
+    html+='<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:4px">⚠️ 세빼기 미전환 전표 '+unmigrated.length+'건 발견</div>';
+    html+='<div style="font-size:11px;color:#64748b;margin-bottom:8px">과세 구분이 있지만 소비세 분리가 안 된 기존 전표입니다. 아래 버튼으로 일괄 전환하세요.</div>';
+    html+='<button class="bt rd" onclick="migrateTaxSplit()">기존 전표 소비세 분리 실행 ('+unmigrated.length+'건)</button>';
+    html+='</div>';
+  }
+
+  // 매출세액 vs 매입세액 summary
+  var isRefund=netTax<0;
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">';
+  html+='<div style="background:#fff;border:1px solid #e2e6ed;border-radius:8px;padding:12px;text-align:center;border-top:3px solid #d97706">';
+  html+='<div style="font-size:10px;color:#d97706;font-weight:600">매출세액 (売上税額)</div>';
+  html+='<div style="font-size:16px;font-weight:700;margin-top:4px">'+fm(outputTax)+'</div>';
+  html+='<div style="font-size:9px;color:#64748b">211 가수소비세 잔액</div></div>';
+  html+='<div style="background:#fff;border:1px solid #e2e6ed;border-radius:8px;padding:12px;text-align:center;border-top:3px solid #2563eb">';
+  html+='<div style="font-size:10px;color:#2563eb;font-weight:600">매입세액 (仕入税額)</div>';
+  html+='<div style="font-size:16px;font-weight:700;margin-top:4px">'+fm(inputTax)+'</div>';
+  html+='<div style="font-size:9px;color:#64748b">154 가지급소비세 잔액</div></div>';
+  html+='<div style="background:#fff;border:1px solid #e2e6ed;border-radius:8px;padding:12px;text-align:center;border-top:3px solid '+(isRefund?'#059669':'#dc2626')+'">';
+  html+='<div style="font-size:10px;color:'+(isRefund?'#059669':'#dc2626')+';font-weight:600">'+(isRefund?'환급세액 (還付)':'납부세액 (納付)')+'</div>';
+  html+='<div style="font-size:16px;font-weight:700;margin-top:4px;color:'+(isRefund?'#059669':'#dc2626')+'">'+fm(Math.abs(netTax))+'</div>';
+  html+='<div style="font-size:9px;color:#64748b">매출세액 - 매입세액</div></div></div>';
+
+  // 결산 정산전표 생성
+  html+='<div class="pn" style="padding:14px;margin-bottom:14px"><div style="font-size:13px;font-weight:700;margin-bottom:10px">📋 소비세 결산 정산전표</div>';
+  if(isRefund){
+    html+='<div style="margin-bottom:8px;font-size:12px">① DR 211(가수소비세) '+fm(outputTax)+' / CR 154(가지급소비세) '+fm(outputTax)+' (상계)</div>';
+    html+='<div style="margin-bottom:8px;font-size:12px">② DR 122(미수입금) '+fm(Math.abs(netTax))+' / CR 154(가지급소비세) '+fm(Math.abs(netTax))+' (환급)</div>';
+  } else if(netTax>0){
+    html+='<div style="margin-bottom:8px;font-size:12px">① DR 211(가수소비세) '+fm(inputTax)+' / CR 154(가지급소비세) '+fm(inputTax)+' (상계)</div>';
+    html+='<div style="margin-bottom:8px;font-size:12px">② DR 211(가수소비세) '+fm(netTax)+' / CR 206(미지급소비세) '+fm(netTax)+' (납부)</div>';
+  } else {
+    html+='<div style="margin-bottom:8px;font-size:12px">소비세 = 0 (과세거래 없음)</div>';
+  }
+  html+='<button class="bt '+(isRefund?'gn':'rd')+'" onclick="genTaxSettlement()" '+(netTax===0?'disabled':'')+'>정산전표 생성 (결산 시)</button>';
+  html+=' <span style="font-size:10px;color:#64748b">중복 체크 있음</span>';
+  var taxJournals=D.journals.filter(function(j){return j.desc&&j.desc.indexOf('[소비세정산]')>=0;});
+  if(taxJournals.length>0){
+    html+='<div style="margin-top:8px;font-size:10px;color:#d97706">⚠️ 이미 정산전표 '+taxJournals.length+'건: ';
+    taxJournals.forEach(function(j){html+=j.no+' '+fm(j.amt)+'엔 ';});
+    html+='</div>';
+  }
+  html+='</div>';
+
+  // 소비세 전표 상세 (154/211 entries)
+  var taxEntries=D.journals.filter(function(j){return j.dr==='154'||j.cr==='211';});
+  html+='<div style="margin-top:12px"><div style="font-size:12px;font-weight:700;margin-bottom:6px">📋 소비세 전표 상세 (154 가지급 / 211 가수)</div>';
+  if(taxEntries.length>0){
+    html+='<table><thead><tr><th>일자</th><th>전표</th><th>적요</th><th>유형</th><th class="r">세액</th></tr></thead><tbody>';
+    taxEntries.forEach(function(j,i){
+      var type=j.dr==='154'?'<span style="color:#2563eb">매입세</span>':'<span style="color:#d97706">매출세</span>';
+      html+='<tr class="'+(i%2?'a':'')+'"><td class="mu m">'+j.dt+'</td><td style="color:#2563eb;font-size:10px">'+(j.no||'-')+'</td><td>'+j.desc+'</td><td>'+type+'</td><td class="r m b">'+fm(j.amt)+'</td></tr>';
     });
     html+='</tbody></table>';
   } else {
-    html+='<div style="padding:20px;text-align:center;color:#64748b">과세거래가 없습니다. 전표 기표 시 소비세 구분을 선택하세요.</div>';
+    html+='<div style="padding:20px;text-align:center;color:#64748b">소비세 전표가 없습니다. 과세거래 전표 입력 시 자동 생성됩니다.</div>';
   }
   html+='</div>';
-  
+
+  html+='<div class="ib" style="margin-top:14px;font-size:10px">';
+  html+='💡 <b>세빼기 경리 (税抜経理方式):</b> 전표 기표 시 소비세 구분(과세10%/경감8%) 선택하면 본체와 소비세가 자동 분리됩니다.<br>';
+  html+='• 매입: DR 비용(본체) + DR 154(가지급소비세) / CR 보통예금(세포함액)<br>';
+  html+='• 결산: 154와 211을 상계 → 차액을 206(납부) 또는 122(환급)으로 정산<br>';
+  html+='• 환급 가능: 매출세액 < 매입세액 → 소비세 환급 신청 (세리사 확인 필요)</div>';
   return html;
+}
+
+// --- 소비세 결산 정산전표 ---
+function genTaxSettlement(){
+  var existing=D.journals.filter(function(j){return j.desc&&j.desc.indexOf('[소비세정산]')>=0;});
+  if(existing.length>0){
+    if(!confirm('⚠️ 이미 정산전표가 '+existing.length+'건 있습니다. 중복 생성하시겠습니까?')) return;
+  }
+  var inputTax=acctBal('154');
+  var outputTax=acctBal('211');
+  if(inputTax===0&&outputTax===0){toast('정산할 소비세가 없습니다','warn');return;}
+  var netTax=outputTax-inputTax;
+  var isRefund=netTax<0;
+  var count=0;
+  // Step 1: 상계 (netting) — smaller of the two
+  var netAmt=Math.min(inputTax,outputTax);
+  if(netAmt>0){
+    D.journals.push({id:nid(),dt:'5/31',no:genSlipNo('2026-05','211','154'),desc:'소비세 상계 (가수↔가지급) [소비세정산]',dr:'211',cr:'154',amt:netAmt,edt:'2026-05-31',pdt:'2026-05-31',cur:'JPY',exp:'',vendor:'',taxCls:''});
+    count++;
+  }
+  // Step 2: remainder
+  var remainder=Math.abs(netTax);
+  if(remainder>0){
+    if(isRefund){
+      // 환급: DR 122(미수입금) / CR 154(가지급소비세)
+      D.journals.push({id:nid(),dt:'5/31',no:genSlipNo('2026-05','122','154'),desc:'소비세 환급액 [소비세정산]',dr:'122',cr:'154',amt:remainder,edt:'2026-05-31',pdt:'2026-05-31',cur:'JPY',exp:'',vendor:'',taxCls:''});
+    } else {
+      // 납부: DR 211(가수소비세) / CR 206(미지급소비세)
+      D.journals.push({id:nid(),dt:'5/31',no:genSlipNo('2026-05','211','206'),desc:'소비세 납부액 [소비세정산]',dr:'211',cr:'206',amt:remainder,edt:'2026-05-31',pdt:'2026-05-31',cur:'JPY',exp:'',vendor:'',taxCls:''});
+    }
+    count++;
+  }
+  saveD();
+  toast('소비세 정산전표 '+count+'건 생성 ('+(isRefund?'환급 ':'납부 ')+fm(remainder)+'엔)');
+  go('fs');
+}
+
+// --- 기존 전표 소비세 분리 마이그레이션 ---
+function migrateTaxSplit(){
+  var expCodes={};D.accts.filter(function(ac){return ac.g==='비용';}).forEach(function(ac){expCodes[ac.c]=true;});
+  var revCodes={};D.accts.filter(function(ac){return ac.g==='수익';}).forEach(function(ac){revCodes[ac.c]=true;});
+  var targets=D.journals.filter(function(j){
+    if(j.taxCls!=='과세10%'&&j.taxCls!=='경감8%') return false;
+    if(j.dr==='154'||j.cr==='211') return false;
+    if(j.desc&&j.desc.indexOf('[소비세]')>=0) return false;
+    return true;
+  });
+  if(targets.length===0){toast('전환할 전표가 없습니다');return;}
+  if(!confirm(targets.length+'건의 과세 전표를 세빼기로 전환합니다.\n\n본체 금액이 조정되고 소비세 분리 전표가 자동 생성됩니다.\n계속하시겠습니까?')) return;
+  var count=0,totalTax=0;
+  targets.forEach(function(j){
+    var rate=j.taxCls==='경감8%'?8:10;
+    var taxAmt=Math.round(j.amt*rate/(100+rate));
+    if(taxAmt<=0) return;
+    var netAmt=j.amt-taxAmt;
+    var isExp=expCodes[j.dr];
+    var isRev=revCodes[j.cr];
+    // Adjust main entry to net amount
+    j.amt=netAmt;
+    // Create companion tax entry
+    var taxDr=isExp?'154':j.dr;
+    var taxCr=isRev?'211':j.cr;
+    var taxNo=genSlipNo(j.edt||'2026-03',taxDr,taxCr);
+    D.journals.push({
+      id:nid(),dt:j.dt,no:taxNo,desc:'[소비세] '+j.desc,
+      dr:taxDr,cr:taxCr,amt:taxAmt,
+      edt:j.edt||'',pdt:j.pdt||'',cur:j.cur||'JPY',exp:'',vendor:j.vendor||'',taxCls:j.taxCls
+    });
+    count++;totalTax+=taxAmt;
+  });
+  saveD();
+  toast('세빼기 전환 완료: '+count+'건, 소비세 합계 '+fm(totalTax)+'엔');
+  go('fs');
 }
 
 
@@ -3749,7 +3853,7 @@ function rTxTab(){
   
   return '<div class="pn" style="padding:18px;max-width:520px">'+
     '<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:4px">법인세 등 추정 상세</div>'+
-    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">태성주식회사 (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
+    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">ChunghoICT Japan (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
     '<div class="fr h"><span>경상이익 (과세소득)</span><span class="m">'+fm(oi)+'</span></div>'+
     '<div style="height:8px"></div>'+
     '<div class="fr h" style="color:#1e3a5f"><span>① 국세</span></div>'+
