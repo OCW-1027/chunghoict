@@ -1,5 +1,5 @@
 // ===== STORAGE =====
-const DKEY='chungho_data', SKEY='chungho_settings';
+const DKEY='taesung_data', SKEY='taesung_settings';
 // DEF_SET defined above
 function loadJ(k,def){try{const v=localStorage.getItem(k);return v?{...def,...JSON.parse(v)}:def;}catch(e){return def;}}
 // SET defined above
@@ -24,9 +24,56 @@ function saveD(){D._lastSaved=new Date().toISOString();localStorage.setItem(DKEY
 function saveS(){localStorage.setItem(SKEY,JSON.stringify(SET));}
 function nid(){return Date.now()+Math.floor(Math.random()*1000);}
 
+// === 법인계좌 자동 추출 (전표 기반, 2026-05-20 추가) ===
+// D.bkIn/D.bkOut를 폐기하고 D.journals에서 dr=110 (입금) / cr=110 (출금) 자동 추출
+function calcBkIn(){
+  return D.journals.filter(function(j){return j.dr==='110';}).map(function(j){
+    var type='income';
+    if(j.cr==='300') type='capital';
+    else if(j.cr==='221') type='loan';
+    else if(j.cr==='191') type='sec';
+    else if(j.cr==='401'||j.cr==='402'||j.cr==='405') type='income';
+    return {
+      id:j.id, dt:j.edt||convertDt(j.dt), cat:j.desc||'', ja:j.desc||'',
+      amt:Number(j.amt), type:type, no:j.no, vendor:j.vendor||''
+    };
+  }).sort(function(a,b){return (a.dt||'').localeCompare(b.dt||'');});
+}
+function calcBkOut(){
+  return D.journals.filter(function(j){return j.cr==='110';}).map(function(j){
+    var type='expense';
+    if(j.dr==='191') type='sec';
+    else if(j.dr==='221') type='loan';
+    else if(j.dr==='230'||j.dr==='231'||j.dr==='203'||j.dr==='207'||j.dr==='208') type='payable';
+    return {
+      id:j.id, dt:j.edt||convertDt(j.dt), cat:j.desc||'', ja:j.desc||'',
+      amt:Number(j.amt), type:type, no:j.no, vendor:j.vendor||''
+    };
+  }).sort(function(a,b){return (a.dt||'').localeCompare(b.dt||'');});
+}
+function convertDt(dt){
+  // dt 형식 "M/D" → "YYYY-MM-DD"
+  if(!dt) return '';
+  if(dt.indexOf('-')>=0) return dt;
+  var parts=dt.split('/');
+  if(parts.length!==2) return dt;
+  var m=parseInt(parts[0]),d=parseInt(parts[1]);
+  // 6~12월은 2025, 1~5월은 2026 (회계연도)
+  var y=m>=6?2025:2026;
+  return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+// D.bkIn/D.bkOut를 동적 getter로 정의 (saveD 시 직렬화 방지)
+function syncBankFromJournals(){
+  var newIn=calcBkIn();
+  var newOut=calcBkOut();
+  D.bkIn=newIn;
+  D.bkOut=newOut;
+}
+
+
 
 // ===== PIN LOCK =====
-const PIN_KEY='chungho_pin';
+const PIN_KEY='taesung_pin';
 let pinBuffer='';
 let pinMode='unlock'; // 'unlock','setNew','confirmNew'
 let pinTemp='';
@@ -138,7 +185,7 @@ function fetchRate(){
       const krwRate=data.rates.KRW;
       SET.rates.USDJPY=Math.round(jpyRate*1000000)/1000000;
       SET.rates.JPYKRW=krwRate&&jpyRate?Math.round(krwRate/jpyRate*1000000)/1000000:SET.rates.JPYKRW;
-      localStorage.setItem('chungho_settings',JSON.stringify(SET));
+      localStorage.setItem('taesung_settings',JSON.stringify(SET));
       if(btn)btn.textContent='✅ 완료! USD/JPY: '+SET.rates.USDJPY;
       // Update settings page inputs if visible
       const r1=document.getElementById('r1');if(r1)r1.value=SET.rates.USDJPY;
@@ -333,7 +380,7 @@ function renderTrendChart(period){
 
 
 // ===== FIREBASE SYNC =====
-const FB_DOC = 'chunghoict_main';
+const FB_DOC = 'taesung_main';
 const FB_COL = 'appdata';
 let fbReady = false;
 
@@ -897,6 +944,7 @@ function jDispDate(j){
 function jSortKey(j){return jFullDate(j);} // ISO format for sorting
 
 function calc(){
+  syncBankFromJournals(); // 법인계좌 자동 동기화 (전표 기반)
   const jpMv=D.holdJP.reduce((s,h)=>s+h.mv,0),jpC=D.holdJP.reduce((s,h)=>s+h.tc,0);
   const usMv=D.holdUS.reduce((s,h)=>s+h.mv,0),usC=D.holdUS.reduce((s,h)=>s+h.tc,0);
   const tI=D.bkIn.reduce((s,d)=>s+d.amt,0),tO=D.bkOut.reduce((s,d)=>s+d.amt,0);
@@ -919,11 +967,11 @@ function closeModal(){document.getElementById('modal').classList.add('hidden');}
 
 
 // ===== CRUD & PAGES =====
-function addBkIn(){showModal('입금 내역추가',`<div class="fg"><div><label>날짜</label><input type="date" id="f_dt"></div><div><label>구분</label><input id="f_cat" placeholder="구분(내역)"></div><div><label>분류</label><select id="f_type"><option value="income">수익</option><option value="capital">자본금</option><option value="loan">차입금 (부채)</option><option value="sec">증권이체</option></select></div><div><label>금액 (엔)</label><input type="number" id="f_amt" placeholder="0"></div><div style="display:flex;gap:8px;justify-content:flex-end;align-items:end"><button class="bt gh" onclick="closeModal()">취소</button><button class="bt gn" onclick="doAddBkIn()">추가</button></div></div>`);}
-function doAddBkIn(){const dt=document.getElementById('f_dt').value,cat=document.getElementById('f_cat').value,amt=Number(document.getElementById('f_amt').value),type=document.getElementById('f_type').value;if(!dt||!amt)return alert('날짜와 금액을 입력하세요');D.bkIn.push({id:nid(),dt,cat,amt,type});saveD();closeModal();toast('입금 내역 추가 완료');go('bank');}
-function addBkOut(){showModal('출금 내역추가',`<div class="fg"><div><label>날짜</label><input type="date" id="f_dt"></div><div><label>구분</label><input id="f_cat" placeholder="구분(내역)"></div><div><label>분류</label><select id="f_type"><option value="expense">경비</option><option value="sec">증권이체</option><option value="loan">차입금상환 (부채)</option><option value="other">기타</option></select></div><div><label>금액 (엔)</label><input type="number" id="f_amt" placeholder="0"></div><div style="display:flex;gap:8px;justify-content:flex-end;align-items:end"><button class="bt gh" onclick="closeModal()">취소</button><button class="bt rd" onclick="doAddBkOut()">추가</button></div></div>`);}
-function doAddBkOut(){const dt=document.getElementById('f_dt').value,cat=document.getElementById('f_cat').value,amt=Number(document.getElementById('f_amt').value),type=document.getElementById('f_type').value;if(!dt||!amt)return alert('날짜와 금액을 입력하세요');D.bkOut.push({id:nid(),dt,cat,amt,type});saveD();closeModal();toast('출금 내역 추가 완료');go('bank');}
-function delBk(type,id){if(!confirm('삭제하시겠습니까?'))return;if(type==='in')D.bkIn=D.bkIn.filter(x=>x.id!==id);else D.bkOut=D.bkOut.filter(x=>x.id!==id);saveD();go('bank');}
+function addBkIn(){toast('입금은 전표 작성(📝)에서 작성하세요\nDR=110 보통예금');setTimeout(function(){go('slip');},800);}
+function doAddBkIn(){toast('전표(📝)로 작성하세요');}
+function addBkOut(){toast('출금은 전표 작성(📝)에서 작성하세요\nCR=110 보통예금');setTimeout(function(){go('slip');},800);}
+function doAddBkOut(){toast('전표(📝)로 작성하세요');}
+function delBk(type,id){toast('삭제는 전표(📝)에서 하세요');}
 
 // ===== CRUD: Securities Holdings =====
 function addHoldJP(){showModal('일본 종목 추가',`<div class="fg">
@@ -1122,17 +1170,17 @@ function exportWord(){
 <head><meta charset="utf-8">
 <style>@page{size:A4 landscape;margin:12mm} body{font-family:'Malgun Gothic',sans-serif;font-size:11pt;color:#1a2030}</style></head>
 <body>
-<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">ChunghoICT 자금운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
+<div style="text-align:center;margin-bottom:16pt"><div style="font-size:20pt;font-weight:bold;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:11pt;color:#666;margin-top:4pt">${rptDt()} 기준</div></div>
 
 <h2 style="font-size:13pt;color:#1e3a5f;border-bottom:2pt solid #1e3a5f;padding-bottom:4pt">1. 총자산내역</h2>
 <table ${T}><tr><td style="${TH}">구분</td><td style="${THR}">내역(엔)</td><td style="${TH}">비고</td></tr>
 <tr><td style="${S}">자본금</td><td style="${HR}">${fm(acctBal("300"))}</td><td style="${S}"></td></tr>
 <tr><td style="${S}background:#f5f5f5">수입</td><td style="${HR}background:#f5f5f5">${fm(opIn2)}</td><td style="${S}background:#f5f5f5"></td></tr>
 <tr><td style="${S}">지출</td><td style="${HR}color:#dc2626">(${fm(opOut2)})</td><td style="${S}"></td></tr>
-<tr><td style="${S}background:#f5f5f5;font-weight:bold">법인계좌잔액---(1)</td><td style="${HB}background:#f5f5f5">${fm(c.bb)}</td><td style="${S}background:#f5f5f5;color:#888">은행</td></tr>
+<tr><td style="${S}background:#f5f5f5;font-weight:bold">법인계좌잔액---(1)</td><td style="${HB}background:#f5f5f5">${fm(c.bb)}</td><td style="${S}background:#f5f5f5;color:#888">미츠이스미토모</td></tr>
 <tr><td style="${S}">증권예수금</td><td style="${HR}">${fm(c.secDep)}</td><td style="${S}"></td></tr>
 <tr><td style="${S}background:#f5f5f5">유가증권평가액</td><td style="${HR}background:#f5f5f5">${fm(c.allMv)}</td><td style="${S}background:#f5f5f5"></td></tr>
-<tr><td style="${S}font-weight:bold">증권계좌잔액---(2)</td><td style="${HB}">${fm(c.secBal)}</td><td style="${S}color:#888">증권회사</td></tr>
+<tr><td style="${S}font-weight:bold">증권계좌잔액---(2)</td><td style="${HB}">${fm(c.secBal)}</td><td style="${S}color:#888">SMBC닛코증권</td></tr>
 <tr><td style="${S}background:#e8e8e8;font-weight:bold">총보유자산합계</td><td style="${HB}background:#e8e8e8">${fm(c.bb+c.secBal)}</td><td style="${S}background:#e8e8e8;color:#888">(1)+(2)</td></tr>
 ${c.totA!==(c.bb+c.secBal)?`<tr><td style="${S}background:#dbeafe;font-weight:bold;color:#2563eb">총보유자산합계 (소비세환급시)</td><td style="${HB}background:#dbeafe;color:#2563eb">${fm(c.totA)}</td><td style="${S}background:#dbeafe;color:#888;font-size:9pt">가지급소비세 ${fm(c.totA-c.bb-c.secBal)} 포함</td></tr>`:''}</table>
 
@@ -1163,12 +1211,12 @@ ${realRows}
 <table style="width:48%;border-collapse:collapse;float:left"><tr><td colspan="4" style="${TH}${R}">출금 상세내역</td></tr><tr><td style="${TH}">일자</td><td style="${TH}">구분</td><td style="${THR}">출금액</td><td style="${THR}">누적</td></tr>${bkOutRows}
 <tr><td colspan="2" style="${S}background:#e8e8e8;font-weight:bold;text-align:right">잔액</td><td colspan="2" style="${HB}background:#e8e8e8;color:#2563eb;font-size:12pt">${fm(c.bb)}</td></tr></table>
 <div style="clear:both"></div>
-<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 ChunghoICT 재무관리 프로그램에서 자동 생성되었습니다.</p>
+<br><p style="color:#999;font-size:9pt;text-align:center">본 보고서는 태성㈜ 재무관리 프로그램에서 자동 생성되었습니다.</p>
 </body></html>`;
 
   const blob=new Blob([wordHTML],{type:'application/msword'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
-  a.href=url;a.download='ChunghoICT_운용보고서_'+new Date().toISOString().slice(0,10)+'.doc';
+  a.href=url;a.download='태성_자금운용보고서_'+new Date().toISOString().slice(0,10)+'.doc';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
@@ -2079,11 +2127,12 @@ function rBank(){const c=calc();let cI=0,cO=0;
   var sortedIn=D.bkIn.slice().sort(function(a,b){return (a.dt||'').localeCompare(b.dt||'');});
   var sortedOut=D.bkOut.slice().sort(function(a,b){return (a.dt||'').localeCompare(b.dt||'');});
   return `<div class="pt">법인계좌</div>
+  <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:6px;padding:10px 14px;margin:8px 0;font-size:12px;color:#1e40af">💡 이 내역은 <b>전표(📝)에서 자동 추출</b>됩니다. 입금/출금을 추가하려면 전표 작성에서 DR=110 또는 CR=110으로 입력하세요.</div>
   <div class="cards"><div class="cd bl"><div class="l">잔액</div><div class="v">${fy(c.bb)}</div></div><div class="cd gn"><div class="l">총입금</div><div class="v">${fy(c.tI)}</div></div><div class="cd rd"><div class="l">총출금</div><div class="v">${fy(c.tO)}</div></div></div>
-  <div class="pn"><div class="ph" style="color:#059669"><span>입금</span><button class="bt gn" onclick="addBkIn()">+ 내역추가</button></div><table><thead><tr><th>일자</th><th>구분</th><th class="r">입금액(엔)</th><th class="r">누적(엔)</th><th></th></tr></thead>
-  <tbody>${sortedIn.map((d,i)=>{cI+=d.amt;return`<tr class="${i%2?'a':''}"><td class="mu m">${d.dt}</td><td>${d.cat}</td><td class="r m gn">${fm(d.amt)}</td><td class="r m b">${fm(cI)}</td><td><button class="del" onclick="delBk('in',${d.id})">✕</button></td></tr>`;}).join('')}</tbody></table></div>
-  <div class="pn"><div class="ph" style="color:#dc2626"><span>출금</span><button class="bt rd" onclick="addBkOut()">+ 내역추가</button></div><table><thead><tr><th>일자</th><th>구분</th><th class="r">출금액(엔)</th><th class="r">누적(엔)</th><th></th></tr></thead>
-  <tbody>${sortedOut.map((d,i)=>{cO+=d.amt;return`<tr class="${i%2?'a':''}"><td class="mu m">${d.dt}</td><td>${d.cat}</td><td class="r m rd">${fm(d.amt)}</td><td class="r m">${fm(cO)}</td><td><button class="del" onclick="delBk('out',${d.id})">✕</button></td></tr>`;}).join('')}</tbody>
+  <div class="pn"><div class="ph" style="color:#059669"><span>입금</span><button class="bt gn" onclick="go('slip')">📝 전표 작성</button></div><table><thead><tr><th>일자</th><th>구분</th><th class="r">입금액(엔)</th><th class="r">누적(엔)</th><th></th></tr></thead>
+  <tbody>${sortedIn.map((d,i)=>{cI+=d.amt;return`<tr class="${i%2?'a':''}"><td class="mu m">${d.dt}</td><td>${d.cat}</td><td class="r m gn">${fm(d.amt)}</td><td class="r m b">${fm(cI)}</td><td><button class="del" onclick="editSlip(${d.id})" title="전표 편집" style="background:#eff6ff;color:#2563eb">📝</button></td></tr>`;}).join('')}</tbody></table></div>
+  <div class="pn"><div class="ph" style="color:#dc2626"><span>출금</span><button class="bt rd" onclick="go('slip')">📝 전표 작성</button></div><table><thead><tr><th>일자</th><th>구분</th><th class="r">출금액(엔)</th><th class="r">누적(엔)</th><th></th></tr></thead>
+  <tbody>${sortedOut.map((d,i)=>{cO+=d.amt;return`<tr class="${i%2?'a':''}"><td class="mu m">${d.dt}</td><td>${d.cat}</td><td class="r m rd">${fm(d.amt)}</td><td class="r m">${fm(cO)}</td><td><button class="del" onclick="editSlip(${d.id})" title="전표 편집" style="background:#eff6ff;color:#2563eb">📝</button></td></tr>`;}).join('')}</tbody>
   <tr class="t"><td colspan="2" class="r">잔액</td><td colspan="3" class="r m" style="font-size:15px;color:#2563eb">${fm(c.bb)}</td></tr></table></div>`;}
 
 function rFS(){
@@ -2105,7 +2154,7 @@ function rFS(){
   ].filter(x=>x.a>0);
 
   return '<div style="display:flex;justify-content:space-between;align-items:center"><div class="pt">재무제표</div><button class="bt" onclick="exportFSWord()" style="background:#2563eb;font-size:11px">📥 워드 내보내기 (日本語)</button></div><div class="tabs"><button class="tab on" data-tab="pl">손익계산서</button><button class="tab" data-tab="bs">대차대조표</button><button class="tab" data-tab="tx">법인세추정</button><button class="tab" data-tab="monthly" onclick="showMonthlyTab(this)">월차추이</button><button class="tab" data-tab="expense" onclick="showExpenseTab(this)">비용분석</button><button class="tab" data-tab="cashflow">현금흐름</button><button class="tab" data-tab="taxsum">소비세</button><button class="tab" data-tab="withholding">원천징수</button><button class="tab" data-tab="trial">시산표</button></div>'+
-  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">ChunghoICT Co., Ltd. (단위:엔)</div></div>'+
+  '<div id="TC"><div class="pn" style="padding:18px;max-width:680px"><div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">손 익 계 산 서 (잠정)</div><div style="font-size:12px;color:#64748b">태성주식회사 (단위:엔)</div></div>'+
   '<div class="fr"><span>Ⅰ 매출액</span><span class="m">0</span></div><div class="fr b"><span>매출총이익</span><span class="m">0</span></div><div style="height:8px"></div>'+
   '<div class="fr h"><span>Ⅱ 판매비와 일반관리비</span></div>'+
   sga.map(s=>'<div class="fr i"><span>'+s.nm+(s.n?' <span style="font-size:10px;color:#64748b">('+s.n+')</span>':'')+'</span><span class="m">'+fm(s.a)+'</span></div>').join('')+
@@ -2204,7 +2253,7 @@ function rRpt(){const c=calc();
   D.bkOut.slice().sort(function(a,b){return (a.dt||'').localeCompare(b.dt||'');}).forEach((d,i)=>{cO+=d.amt;bkOutRows+='<tr class="'+(i%2?'a':'')+'"><td class="mu m">'+d.dt+'</td><td>'+d.cat+'</td><td class="r m rd">'+fm(d.amt)+'</td><td class="r m">'+fm(cO)+'</td></tr>';});
 
   return '<div style="max-width:1100px" id="rptContent">'+
-    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">ChunghoICT 자금운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
+    '<div contenteditable="true" style="text-align:center;margin-bottom:20px"><div style="font-size:22px;font-weight:700;color:#1e3a5f">태성㈜ 자금운용보고서</div><div style="font-size:13px;color:#64748b;margin-top:4px">'+rptDt()+' 기준</div></div>'+
     '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><button class="bt" onclick="window.print()">🖨 인쇄 (A4)</button><button class="bt" onclick="exportWord()" style="background:#2563eb">📥 워드 내보내기</button><button class="bt" onclick="saveRptEdits()" style="background:#059669">💾 편집 저장</button><button class="bt gh" onclick="clearRptEdits()">🔄 원본 복원</button></div>'+
 
     // 1. 총자산내역
@@ -2215,10 +2264,10 @@ function rRpt(){const c=calc();
     '<tr><td>지출</td><td class="r m" style="color:#dc2626">('+fm(opOut)+')</td><td class="mu">경비 지출</td></tr>'+
     '<tr class="a" style="font-size:10px;color:#64748b"><td>　참고) 총입금 (증권이체 포함)</td><td class="r m" style="color:#64748b">'+fm(tI-acctBal('300'))+'</td><td class="mu" style="color:#64748b">자본금 외 전체</td></tr>'+
     '<tr style="font-size:10px;color:#64748b"><td>　참고) 총출금 (증권이체 포함)</td><td class="r m" style="color:#64748b">('+fm(tO)+')</td><td></td></tr>'+
-    '<tr class="a" style="font-weight:700"><td>법인계좌잔액---(1)</td><td class="r m b">'+fm(c.bb)+'</td><td class="mu">은행</td></tr>'+
+    '<tr class="a" style="font-weight:700"><td>법인계좌잔액---(1)</td><td class="r m b">'+fm(c.bb)+'</td><td class="mu">미츠이스미토모</td></tr>'+
     '<tr><td>증권예수금</td><td class="r m">'+fm(c.secDep)+'</td><td></td></tr>'+
     '<tr class="a"><td>유가증권평가액</td><td class="r m">'+fm(c.allMv)+'</td><td></td></tr>'+
-    '<tr style="font-weight:700"><td>증권계좌잔액---(2)</td><td class="r m b">'+fm(c.secBal)+'</td><td class="mu">증권회사</td></tr>'+
+    '<tr style="font-weight:700"><td>증권계좌잔액---(2)</td><td class="r m b">'+fm(c.secBal)+'</td><td class="mu">SMBC닛코증권</td></tr>'+
     '<tr class="t"><td>총보유자산합계</td><td class="r m">'+fm(c.bb+c.secBal)+'</td><td class="mu">(1)+(2)</td></tr>'+
     (c.totA!==(c.bb+c.secBal)?'<tr style="background:#dbeafe"><td style="font-weight:700;color:#2563eb">총보유자산합계 (소비세환급시)</td><td class="r m b" style="color:#2563eb">'+fm(c.totA)+'</td><td class="mu" style="font-size:10px">가지급소비세 '+fm(c.totA-c.bb-c.secBal)+' 포함</td></tr>':'')+
     '</tbody></table></div>'+
@@ -2272,7 +2321,7 @@ function rRpt(){const c=calc();
 // ===== DATA BACKUP / RESTORE =====
 function exportBackup(){
   const backup={
-    version:'chunghoict_v26',
+    version:'taesung_v26',
     exportDate:new Date().toISOString(),
     data:D,
     settings:SET,
@@ -2283,7 +2332,7 @@ function exportBackup(){
   const url=URL.createObjectURL(blob);
   const a2=document.createElement('a');
   a2.href=url;
-  a2.download='chunghoict_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a2.download='taesung_backup_'+new Date().toISOString().slice(0,10)+'.json';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
   URL.revokeObjectURL(url);
   alert('백업 완료!\n파일: '+a2.download);
@@ -2416,7 +2465,7 @@ function exportGLExcel(){
     bal[j.cr].cr+=j.amt;bal[j.cr].entries.push({...j,isDr:false,dispDt:jDispDate(j),sortKey:jSortKey(j)});
   });
   let html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>td,th{mso-number-format:"\@"}</style></head><body>';
-  html+='<h2 style="font-size:14pt;color:#1e3a5f">ChunghoICT Co., Ltd.　総勘定元帳</h2>';
+  html+='<h2 style="font-size:14pt;color:#1e3a5f">泰成株式会社　総勘定元帳</h2>';
   html+='<p style="font-size:9pt;color:#666">自 令和7年6月2日 至 令和8年4月2日（暫定）</p><br>';
   
   const groups={"자산":"資産","부채":"負債","순자산":"純資産","수익":"収益","비용":"費用"};
@@ -2440,7 +2489,7 @@ function exportGLExcel(){
   html+='</body></html>';
   const blob=new Blob([html],{type:'application/vnd.ms-excel'});
   const url=URL.createObjectURL(blob);const a2=document.createElement('a');
-  a2.href=url;a2.download='ChunghoICT_総勘定元帳_'+new Date().toISOString().slice(0,10)+'.xls';
+  a2.href=url;a2.download='泰成_総勘定元帳_'+new Date().toISOString().slice(0,10)+'.xls';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
@@ -2481,7 +2530,7 @@ function exportFSWord(){
   html+=`
 <div class="stamp"><div class="s1">決裁</div><div class="s2">本人専決</div></div>
 <h1>損 益 計 算 書</h1>
-<div class="sub">ChunghoICT Co., Ltd.<br>自 令和7年6月2日（設立日）至 令和8年4月2日（暫定）<br>（単位：円）</div>
+<div class="sub">泰成株式会社<br>自 令和7年6月2日（設立日）至 令和8年4月2日（暫定）<br>（単位：円）</div>
 
 <table>
 <tr><th style="width:35%">科目</th><th class="r" style="width:20%">内訳</th><th class="r" style="width:20%">小計</th><th class="r" style="width:25%">合計</th></tr>
@@ -2521,7 +2570,7 @@ ${d.evalLoss>0?'<tr><td>　有価証券評価損（未実現）</td><td class="r
 
 <div class="stamp"><div class="s1">決裁</div><div class="s2">本人専決</div></div>
 <h1>貸 借 対 照 表</h1>
-<div class="sub">ChunghoICT Co., Ltd.<br>令和8年4月2日現在（暫定）<br>（単位：円）</div>
+<div class="sub">泰成株式会社<br>令和8年4月2日現在（暫定）<br>（単位：円）</div>
 
 <table>
 <tr><th style="width:40%">科目</th><th class="r" style="width:20%">内訳</th><th class="r" style="width:20%">小計</th><th class="r" style="width:20%">合計</th></tr>
@@ -2551,12 +2600,12 @@ ${(function(){var rows='';D.accts.filter(function(ac){return ac.g==='자산'&&ac
 <tr class="total" style="background:#0d1b3e"><td>負債・純資産合計</td><td></td><td></td><td class="r" style="font-size:12pt">${fm(d.totL+d.totE)}</td></tr>
 </table>
 
-<div class="footer">ChunghoICT Co., Ltd. 財務管理システム ｜ 出力日: ${dateStr} ｜ 本書は暫定値に基づく参考資料です</div>
+<div class="footer">泰成株式会社 財務管理システム ｜ 出力日: ${dateStr} ｜ 本書は暫定値に基づく参考資料です</div>
 </body></html>`;
 
   const blob=new Blob([html],{type:'application/msword'});
   const url=URL.createObjectURL(blob);const a2=document.createElement('a');
-  a2.href=url;a2.download='ChunghoICT_財務諸表_'+new Date().toISOString().slice(0,10)+'.doc';
+  a2.href=url;a2.download='泰成_財務諸表_'+new Date().toISOString().slice(0,10)+'.doc';
   document.body.appendChild(a2);a2.click();document.body.removeChild(a2);URL.revokeObjectURL(url);
 }
 
@@ -3535,7 +3584,7 @@ function rTrialBalance(mode,dateVal){
   else sumHtml+='<span style="color:#dc2626;font-weight:600">✗ 차대불일치 '+fm(diffCheck)+'</span>';
   sumHtml+='</div>';
   
-  return '<div class="pn" style="padding:14px"><div style="text-align:center;margin-bottom:12px"><div style="font-size:16px;font-weight:700">'+titleMap[mode]+'</div><div style="font-size:12px;color:#64748b">ChunghoICT Co., Ltd. (단위:엔)</div></div>'+modeHtml+tHtml+sumHtml+'</div>';
+  return '<div class="pn" style="padding:14px"><div style="text-align:center;margin-bottom:12px"><div style="font-size:16px;font-weight:700">'+titleMap[mode]+'</div><div style="font-size:12px;color:#64748b">태성주식회사 (단위:엔)</div></div>'+modeHtml+tHtml+sumHtml+'</div>';
 }
 
 // ===== 자산관리: 고정자산대장 / 리스·렌탈 / 계약서 관리 =====
@@ -4067,7 +4116,7 @@ function rContractTab(){
 
   var html='<div class="pn" style="padding:14px"><div style="font-size:14px;font-weight:700;margin-bottom:12px">📁 계약 등록</div>';
   html+='<div class="fg">';
-  html+='<div><label>계약명 *</label><input id="ct_name" placeholder="예: 증권회사 특정구좌"></div>';
+  html+='<div><label>계약명 *</label><input id="ct_name" placeholder="예: SMBC닛코증권 특정구좌"></div>';
   html+='<div><label>구분</label><select id="ct_type"><option value="securities">증권</option><option value="banking">은행</option><option value="lease">리스</option><option value="insurance">보험</option><option value="service">서비스</option><option value="other">기타</option></select></div>';
   html+='<div><label>상대방</label><input id="ct_counterparty" placeholder="SMBC日興証券"></div>';
   html+='<div><label>만기 알림 (일전)</label><input type="number" id="ct_alert" value="30"></div>';
@@ -4219,7 +4268,7 @@ function rTxTab(){
   
   return '<div class="pn" style="padding:18px;max-width:520px">'+
     '<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:4px">법인세 등 추정 상세</div>'+
-    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">ChunghoICT Co., Ltd. (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
+    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:14px">태성주식회사 (자본금1천만엔, 도쿄도, 소규모법인)</div>'+
     '<div class="fr h"><span>경상이익 (과세소득)</span><span class="m">'+fm(oi)+'</span></div>'+
     '<div style="height:8px"></div>'+
     '<div class="fr h" style="color:#1e3a5f"><span>① 국세</span></div>'+
